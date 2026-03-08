@@ -12,7 +12,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function TopicHeader({ topic }: { topic: TopicMeta }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const status = statusConfig[topic.status];
 
   return (
@@ -50,7 +50,7 @@ export default function TopicHeader({ topic }: { topic: TopicMeta }) {
         {/* Collapsible prompt */}
         <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-0.5">
           <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
-          {open ? 'Hide discussion prompt' : 'Show discussion prompt'}
+          {open ? 'Hide topic' : 'Show topic'}
         </CollapsibleTrigger>
 
         <CollapsibleContent>
