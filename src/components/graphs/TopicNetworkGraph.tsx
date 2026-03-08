@@ -1,5 +1,8 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Canvas, useFrame, useThree, ThreeEvent } from '@react-three/fiber';
+import { OrbitControls, Text, Billboard } from '@react-three/drei';
+import * as THREE from 'three';
 import {
   forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY,
   SimulationNodeDatum, SimulationLinkDatum,
@@ -7,14 +10,17 @@ import {
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Network, Lightbulb, ChevronRight, ChevronLeft, Maximize2, Minimize2, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
-/* ── Cluster colours (raw HSL for Canvas API — CSS var() doesn't work in Canvas) ── */
+/* ── Cluster colours ── */
 const CLUSTER_COLORS_HSL: [number, number, number][] = [
   [340, 70, 55], [160, 60, 45], [45, 80, 55],
   [270, 55, 58], [195, 70, 50], [15, 75, 55],
 ];
 const CLUSTER_COLORS = CLUSTER_COLORS_HSL.map(([h, s, l]) => `hsl(${h}, ${s}%, ${l}%)`);
+const CLUSTER_THREE_COLORS = CLUSTER_COLORS_HSL.map(([h, s, l]) =>
+  new THREE.Color(`hsl(${h}, ${s}%, ${l}%)`)
+);
 
 function hslA(idx: number, alpha: number) {
   const [h, s, l] = CLUSTER_COLORS_HSL[idx % CLUSTER_COLORS_HSL.length];
@@ -30,7 +36,8 @@ interface GraphNode extends SimulationNodeDatum {
   postCount: number;
   status: string;
   cluster: number;
-  importance: number; // betweenness-like
+  importance: number;
+  z?: number;
 }
 
 interface GraphLink extends SimulationLinkDatum<GraphNode> {
@@ -45,6 +52,7 @@ interface Cluster {
   nodes: GraphNode[];
   cx: number;
   cy: number;
+  cz: number;
   percentage: number;
 }
 
@@ -64,51 +72,252 @@ function computeImportance(nodeId: string, links: { source: string; target: stri
   return degree;
 }
 
-/* ── Component ── */
+/* ── 3D Scene components ── */
+interface NodeSphereProps {
+  node: GraphNode;
+  isHovered: boolean;
+  isSelected: boolean;
+  isDimmed: boolean;
+  onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
+  onDoubleClick: (slug: string) => void;
+}
+
+function NodeSphere({ node, isHovered, isSelected, isDimmed, onHover, onSelect, onDoubleClick }: NodeSphereProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const color = CLUSTER_THREE_COLORS[node.cluster % CLUSTER_THREE_COLORS.length];
+  const radius = Math.max(0.3, Math.min(1.2, 0.3 + node.postCount * 0.1 + node.importance * 0.15));
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.position.set(
+        (node.x ?? 0) * 0.08,
+        (node.y ?? 0) * -0.08,
+        (node.z ?? 0) * 0.08,
+      );
+      const targetScale = isHovered ? 1.3 : isSelected ? 1.15 : 1;
+      meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+    }
+  });
+
+  return (
+    <group>
+      <mesh
+        ref={meshRef}
+        onPointerEnter={(e) => { e.stopPropagation(); onHover(node.id); }}
+        onPointerLeave={(e) => { e.stopPropagation(); onHover(null); }}
+        onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
+        onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(node.slug); }}
+      >
+        <sphereGeometry args={[radius, 24, 24]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={isHovered ? 0.6 : isSelected ? 0.4 : 0.15}
+          transparent
+          opacity={isDimmed ? 0.15 : 0.9}
+          roughness={0.3}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* Label */}
+      {(isHovered || isSelected || !isDimmed) && (
+        <Billboard
+          position={[
+            (node.x ?? 0) * 0.08,
+            (node.y ?? 0) * -0.08 + radius + 0.35,
+            (node.z ?? 0) * 0.08,
+          ]}
+        >
+          <Text
+            fontSize={isHovered ? 0.35 : 0.25}
+            color={isDimmed ? '#999' : '#333'}
+            anchorX="center"
+            anchorY="bottom"
+            font="/fonts/inter-medium.woff"
+            maxWidth={8}
+          >
+            {node.title.length > 32 ? node.title.slice(0, 30) + '…' : node.title}
+          </Text>
+        </Billboard>
+      )}
+    </group>
+  );
+}
+
+interface EdgeLineProps {
+  source: GraphNode;
+  target: GraphNode;
+  sameCluster: boolean;
+  clusterIdx: number;
+  isDimmed: boolean;
+  isHighlighted: boolean;
+}
+
+function EdgeLine({ source, target, sameCluster, clusterIdx, isDimmed, isHighlighted }: EdgeLineProps) {
+  const lineRef = useRef<THREE.LineSegments>(null);
+
+  const color = sameCluster
+    ? CLUSTER_THREE_COLORS[clusterIdx % CLUSTER_THREE_COLORS.length]
+    : new THREE.Color('#aaa');
+
+  const opacity = isDimmed ? 0.03 : isHighlighted ? 0.7 : 0.15;
+
+  useFrame(() => {
+    if (lineRef.current) {
+      const geo = lineRef.current.geometry;
+      const positions = new Float32Array([
+        (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08,
+        (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08,
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.attributes.position.needsUpdate = true;
+    }
+  });
+
+  // Build initial geometry
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array([0, 0, 0, 0, 0, 0]);
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
+
+  const material = useMemo(
+    () => new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+    [color, opacity]
+  );
+
+  return <lineSegments ref={lineRef} geometry={geometry} material={material} />;
+}
+
+function ClusterLabel({ cluster }: { cluster: Cluster }) {
+  return (
+    <Billboard
+      position={[
+        cluster.cx * 0.08,
+        cluster.cy * -0.08 - 2,
+        cluster.cz * 0.08,
+      ]}
+    >
+      <Text
+        fontSize={0.6}
+        color={CLUSTER_COLORS[cluster.id % CLUSTER_COLORS.length]}
+        anchorX="center"
+        anchorY="middle"
+        fillOpacity={0.2}
+        font="/fonts/inter-bold.woff"
+      >
+        {cluster.label}
+      </Text>
+    </Billboard>
+  );
+}
+
+/* ── Scene ── */
+interface SceneProps {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  clusters: Cluster[];
+  hoveredNode: string | null;
+  selectedNode: string | null;
+  onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
+  onDoubleClick: (slug: string) => void;
+}
+
+function Scene({ nodes, links, clusters, hoveredNode, selectedNode, onHover, onSelect, onDoubleClick }: SceneProps) {
+  const connectedToHovered = useMemo(() => {
+    if (!hoveredNode) return new Set<string>();
+    const s = new Set<string>([hoveredNode]);
+    for (const l of links) {
+      const src = typeof l.source === 'object' ? (l.source as GraphNode).id : String(l.source);
+      const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : String(l.target);
+      if (src === hoveredNode) s.add(tgt);
+      if (tgt === hoveredNode) s.add(src);
+    }
+    return s;
+  }, [hoveredNode, links]);
+
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <pointLight position={[10, 10, 10]} intensity={0.8} />
+      <pointLight position={[-10, -10, -10]} intensity={0.3} />
+
+      {/* Edges */}
+      {links.map(l => {
+        const src = l.source as GraphNode;
+        const tgt = l.target as GraphNode;
+        const same = src.cluster === tgt.cluster;
+        const isHigh = hoveredNode ? connectedToHovered.has(src.id) && connectedToHovered.has(tgt.id) : false;
+        const isDim = hoveredNode ? !isHigh : false;
+        return (
+          <EdgeLine
+            key={l.id}
+            source={src}
+            target={tgt}
+            sameCluster={same}
+            clusterIdx={src.cluster}
+            isDimmed={isDim}
+            isHighlighted={isHigh}
+          />
+        );
+      })}
+
+      {/* Nodes */}
+      {nodes.map(node => (
+        <NodeSphere
+          key={node.id}
+          node={node}
+          isHovered={hoveredNode === node.id}
+          isSelected={selectedNode === node.id}
+          isDimmed={!!hoveredNode && !connectedToHovered.has(node.id)}
+          onHover={onHover}
+          onSelect={onSelect}
+          onDoubleClick={onDoubleClick}
+        />
+      ))}
+
+      {/* Cluster labels */}
+      {clusters.map(c => (
+        <ClusterLabel key={c.id} cluster={c} />
+      ))}
+
+      <OrbitControls
+        enablePan
+        enableZoom
+        enableRotate
+        autoRotate
+        autoRotateSpeed={0.3}
+        minDistance={5}
+        maxDistance={50}
+      />
+    </>
+  );
+}
+
+/* ── Main component ── */
 interface Props {
   topics: TopicRow[];
   relations: TopicRelation[];
 }
 
 export default function TopicNetworkGraph({ topics, relations }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [links, setLinks] = useState<GraphLink[]>([]);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 420 });
   const [expanded, setExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
-  const simRef = useRef<ReturnType<typeof forceSimulation<GraphNode>> | null>(null);
-  const nodesRef = useRef<GraphNode[]>([]);
-  const linksRef = useRef<GraphLink[]>([]);
-  const animFrame = useRef<number>(0);
 
-  // Cluster map
   const clusterMap = useMemo(
     () => assignClusters(topics.map(t => t.category)),
     [topics]
   );
 
-  // Resize observer
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      const { width } = entries[0].contentRect;
-      const h = expanded ? Math.min(680, width * 0.65) : Math.min(440, Math.max(320, width * 0.5));
-      setDimensions({ width, height: h });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [expanded]);
-
-  // Build simulation
+  // Build 3D simulation
   useEffect(() => {
     if (topics.length === 0) return;
 
@@ -116,6 +325,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
     const graphNodes: GraphNode[] = topics.map(t => {
       const imp = computeImportance(t.id, rawLinks);
+      const clusterIdx = clusterMap.get(t.category) ?? 0;
       return {
         id: t.id,
         slug: t.slug,
@@ -123,8 +333,10 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         category: t.category,
         postCount: t.post_count || 0,
         status: t.status,
-        cluster: clusterMap.get(t.category) ?? 0,
+        cluster: clusterIdx,
         importance: imp,
+        // Initialize z with cluster-based spread
+        z: (clusterIdx - 3) * 15 + (Math.random() - 0.5) * 20,
       };
     });
 
@@ -138,27 +350,29 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         relationType: r.relation_type,
       }));
 
-    nodesRef.current = graphNodes;
-    linksRef.current = graphLinks;
-
+    // 2D force sim for x/y, then we keep z from initial assignment with some attraction
     const sim = forceSimulation<GraphNode>(graphNodes)
-      .force('link', forceLink<GraphNode, GraphLink>(graphLinks).id(d => d.id).distance(80).strength(0.7))
-      .force('charge', forceManyBody().strength(-180))
-      .force('center', forceCenter(dimensions.width / 2, dimensions.height / 2))
-      .force('collide', forceCollide<GraphNode>().radius(d => nodeRadius(d) + 8))
-      .force('x', forceX(dimensions.width / 2).strength(0.03))
-      .force('y', forceY(dimensions.height / 2).strength(0.03))
-      .alphaDecay(0.02)
+      .force('link', forceLink<GraphNode, GraphLink>(graphLinks).id(d => d.id).distance(100).strength(0.6))
+      .force('charge', forceManyBody().strength(-250))
+      .force('center', forceCenter(0, 0))
+      .force('collide', forceCollide<GraphNode>().radius(d => 12 + (d.postCount || 0) * 2))
+      .force('x', forceX(0).strength(0.02))
+      .force('y', forceY(0).strength(0.02))
+      .alphaDecay(0.015)
       .on('tick', () => {
+        // Gradually pull z toward cluster centroid
+        for (const n of graphNodes) {
+          const targetZ = (n.cluster - 3) * 12;
+          n.z = (n.z ?? 0) * 0.98 + targetZ * 0.02;
+        }
         setNodes([...graphNodes]);
         setLinks([...graphLinks]);
       });
 
-    simRef.current = sim;
     return () => { sim.stop(); };
-  }, [topics, relations, dimensions.width, dimensions.height, clusterMap]);
+  }, [topics, relations, clusterMap]);
 
-  // Compute clusters
+  // Clusters
   const clusters = useMemo<Cluster[]>(() => {
     if (nodes.length === 0) return [];
     const groups = new Map<number, GraphNode[]>();
@@ -167,22 +381,19 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       groups.get(n.cluster)!.push(n);
     }
     const totalPosts = nodes.reduce((s, n) => s + n.postCount, 0) || 1;
-    return Array.from(groups.entries()).map(([id, clusterNodes]) => {
-      const cx = clusterNodes.reduce((s, n) => s + (n.x ?? 0), 0) / clusterNodes.length;
-      const cy = clusterNodes.reduce((s, n) => s + (n.y ?? 0), 0) / clusterNodes.length;
-      const posts = clusterNodes.reduce((s, n) => s + n.postCount, 0);
-      return {
-        id,
-        label: clusterNodes[0].category,
-        color: CLUSTER_COLORS[id % CLUSTER_COLORS.length],
-        nodes: clusterNodes,
-        cx, cy,
-        percentage: Math.round((posts / totalPosts) * 100),
-      };
-    }).sort((a, b) => b.percentage - a.percentage);
+    return Array.from(groups.entries()).map(([id, clusterNodes]) => ({
+      id,
+      label: clusterNodes[0].category,
+      color: CLUSTER_COLORS[id % CLUSTER_COLORS.length],
+      nodes: clusterNodes,
+      cx: clusterNodes.reduce((s, n) => s + (n.x ?? 0), 0) / clusterNodes.length,
+      cy: clusterNodes.reduce((s, n) => s + (n.y ?? 0), 0) / clusterNodes.length,
+      cz: clusterNodes.reduce((s, n) => s + (n.z ?? 0), 0) / clusterNodes.length,
+      percentage: Math.round((clusterNodes.reduce((s, n) => s + n.postCount, 0) / totalPosts) * 100),
+    })).sort((a, b) => b.percentage - a.percentage);
   }, [nodes]);
 
-  // Detect "gaps" – clusters with fewest inter-cluster links
+  // Gaps
   const gaps = useMemo(() => {
     if (clusters.length < 2) return [];
     const interLinks = new Map<string, number>();
@@ -194,7 +405,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         interLinks.set(key, (interLinks.get(key) ?? 0) + 1);
       }
     }
-    // Find pairs of clusters with 0 or minimal connections
     const gapPairs: { a: Cluster; b: Cluster; count: number }[] = [];
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
@@ -206,274 +416,35 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     return gapPairs.sort((a, b) => a.count - b.count).slice(0, 3);
   }, [clusters, links]);
 
-  // Canvas rendering
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = dimensions.width * dpr;
-    canvas.height = dimensions.height * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // Background — detect dark mode
-    const isDark = document.documentElement.classList.contains('dark');
-    ctx.fillStyle = isDark ? 'hsl(220, 15%, 8%)' : 'hsl(220, 15%, 96%)';
-    ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-
-    ctx.save();
-    ctx.translate(transform.x, transform.y);
-    ctx.scale(transform.k, transform.k);
-
-    const connectedToHovered = new Set<string>();
-    if (hoveredNode) {
-      connectedToHovered.add(hoveredNode);
-      for (const l of links) {
-        const src = typeof l.source === 'object' ? (l.source as GraphNode).id : String(l.source);
-        const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : String(l.target);
-        if (src === hoveredNode) connectedToHovered.add(tgt);
-        if (tgt === hoveredNode) connectedToHovered.add(src);
-      }
-    }
-
-    // Draw cluster background regions (subtle glow)
-    for (const cluster of clusters) {
-      if (cluster.nodes.length < 2) continue;
-      const cx = cluster.cx;
-      const cy = cluster.cy;
-      const spread = Math.max(60, cluster.nodes.length * 25);
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, spread);
-      grad.addColorStop(0, hslA(cluster.id, 0.06));
-      grad.addColorStop(1, 'transparent');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, spread, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Draw edges
-    for (const l of links) {
-      const src = l.source as GraphNode;
-      const tgt = l.target as GraphNode;
-      if (src.x == null || tgt.x == null) continue;
-
-      const srcCluster = src.cluster;
-      const tgtCluster = tgt.cluster;
-      const sameCluster = srcCluster === tgtCluster;
-      const edgeColor = sameCluster
-        ? CLUSTER_COLORS[srcCluster % CLUSTER_COLORS.length]
-        : isDark ? 'hsl(0, 0%, 35%)' : 'hsl(0, 0%, 70%)';
-
-      const isHighlighted = hoveredNode && connectedToHovered.has(src.id) && connectedToHovered.has(tgt.id);
-      const isDimmed = hoveredNode && !isHighlighted;
-
-      ctx.beginPath();
-      ctx.moveTo(src.x!, src.y!);
-      ctx.lineTo(tgt.x!, tgt.y!);
-      ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = isHighlighted ? 2 : 0.8;
-      ctx.globalAlpha = isDimmed ? 0.08 : isHighlighted ? 0.9 : 0.3;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-
-    // Draw nodes
-    for (const node of nodes) {
-      if (node.x == null || node.y == null) continue;
-      const r = nodeRadius(node);
-      const color = CLUSTER_COLORS[node.cluster % CLUSTER_COLORS.length];
-      const isHovered = hoveredNode === node.id;
-      const isSelected = selectedNode === node.id;
-      const isDimmed = hoveredNode && !connectedToHovered.has(node.id);
-
-      ctx.globalAlpha = isDimmed ? 0.15 : 1;
-
-      // Glow for hovered/selected
-      if (isHovered || isSelected) {
-        const glow = ctx.createRadialGradient(node.x, node.y, r, node.x, node.y, r * 3);
-        glow.addColorStop(0, hslA(node.cluster, 0.35));
-        glow.addColorStop(1, 'transparent');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r * 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Node circle
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-
-      // Border for selected
-      if (isSelected) {
-        ctx.strokeStyle = isDark ? 'hsl(0, 0%, 90%)' : 'hsl(0, 0%, 20%)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      ctx.globalAlpha = 1;
-
-      // Label – show for important or hovered or no hover
-      const showLabel = isHovered || isSelected || !hoveredNode || node.importance > 1 || node.postCount > 2;
-      if (showLabel) {
-        const fontSize = isHovered ? 12 : Math.max(9, Math.min(13, 8 + node.importance * 1.5 + node.postCount * 0.5));
-        ctx.font = `${isHovered ? 700 : 500} ${fontSize}px Inter, system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = isDimmed
-          ? (isDark ? 'hsla(0, 0%, 85%, 0.15)' : 'hsla(0, 0%, 20%, 0.15)')
-          : isHovered
-            ? (isDark ? 'hsl(0, 0%, 100%)' : 'hsl(0, 0%, 0%)')
-            : (isDark ? 'hsla(0, 0%, 85%, 0.75)' : 'hsla(0, 0%, 15%, 0.75)');
-        ctx.fillText(
-          node.title.length > 30 ? node.title.slice(0, 28) + '…' : node.title,
-          node.x,
-          node.y + r + 5,
-        );
-      }
-    }
-
-    // Cluster labels (large)
-    for (const cluster of clusters) {
-      if (cluster.nodes.length === 0) continue;
-      const fontSize = Math.max(14, Math.min(22, 12 + cluster.nodes.length * 3));
-      ctx.font = `700 ${fontSize}px Inter, system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = hslA(cluster.id, 0.25);
-      ctx.fillText(cluster.label, cluster.cx, cluster.cy - 35);
-    }
-
-    // Gap indicators (dashed lines between disconnected clusters)
-    for (const gap of gaps) {
-      ctx.beginPath();
-      ctx.setLineDash([6, 4]);
-      ctx.moveTo(gap.a.cx, gap.a.cy);
-      ctx.lineTo(gap.b.cx, gap.b.cy);
-      ctx.strokeStyle = 'hsla(320, 70%, 60%, 0.25)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // "gap" label
-      const mx = (gap.a.cx + gap.b.cx) / 2;
-      const my = (gap.a.cy + gap.b.cy) / 2;
-      ctx.font = '600 10px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'hsla(320, 70%, 70%, 0.5)';
-      ctx.textAlign = 'center';
-      ctx.fillText('idea gap', mx, my - 6);
-    }
-
-    ctx.restore();
-  }, [nodes, links, dimensions, hoveredNode, selectedNode, clusters, gaps, transform]);
-
-  const nodeRadius = (node: GraphNode) => Math.max(5, Math.min(18, 5 + node.postCount * 1.5 + node.importance * 2));
-
-  // Hit detection
-  const getNodeAtPoint = useCallback((clientX: number, clientY: number): GraphNode | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left - transform.x) / transform.k;
-    const y = (clientY - rect.top - transform.y) / transform.k;
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const n = nodes[i];
-      if (n.x == null || n.y == null) continue;
-      const r = nodeRadius(n) + 4;
-      if ((n.x - x) ** 2 + (n.y - y) ** 2 <= r ** 2) return n;
-    }
-    return null;
-  }, [nodes, transform]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (isPanning) {
-      setTransform(prev => ({
-        ...prev,
-        x: prev.x + (e.clientX - panStart.x),
-        y: prev.y + (e.clientY - panStart.y),
-      }));
-      setPanStart({ x: e.clientX, y: e.clientY });
-      return;
-    }
-    const node = getNodeAtPoint(e.clientX, e.clientY);
-    setHoveredNode(node?.id ?? null);
-    const canvas = canvasRef.current;
-    if (canvas) canvas.style.cursor = node ? 'pointer' : 'grab';
-  }, [getNodeAtPoint, isPanning, panStart]);
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    const node = getNodeAtPoint(e.clientX, e.clientY);
-    if (!node) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
-      (e.target as Element).setPointerCapture(e.pointerId);
-    }
-  }, [getNodeAtPoint]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (isPanning) {
-      setIsPanning(false);
-      return;
-    }
-    const node = getNodeAtPoint(e.clientX, e.clientY);
-    if (node) {
-      setSelectedNode(prev => prev === node.id ? null : node.id);
-    }
-  }, [getNodeAtPoint, isPanning]);
-
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    const node = getNodeAtPoint(e.clientX, e.clientY);
-    if (node) navigate(`/d/${node.slug}`);
-  }, [getNodeAtPoint, navigate]);
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.08 : 0.92;
-    setTransform(prev => {
-      const newK = Math.max(0.3, Math.min(3, prev.k * factor));
-      return {
-        k: newK,
-        x: mx - (mx - prev.x) * (newK / prev.k),
-        y: my - (my - prev.y) * (newK / prev.k),
-      };
-    });
-  }, []);
-
   const selectedNodeData = useMemo(
     () => nodes.find(n => n.id === selectedNode),
     [nodes, selectedNode]
   );
 
+  const handleSelect = useCallback((id: string) => {
+    setSelectedNode(prev => prev === id ? null : id);
+  }, []);
+
   if (topics.length < 2) return null;
+
+  const graphHeight = expanded ? '100%' : '480px';
 
   return (
     <div className={cn(
-      'rounded-xl overflow-hidden border border-border/50',
+      'rounded-xl overflow-hidden border border-border bg-card',
       expanded && 'fixed inset-4 z-50'
-    )} style={{ background: 'hsl(var(--graph-bg))' }}>
+    )}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/30">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground/80">Discourse Network</span>
+          <span className="text-xs font-semibold text-foreground">Discourse Network</span>
           <span className="text-[10px] text-muted-foreground ml-1">
             {topics.length} topics · {relations.length} connections
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setTransform({ x: 0, y: 0, k: 1 })}
-            className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors"
-          >
-            Reset view
-          </button>
+          <span className="text-[10px] text-muted-foreground mr-1">Drag to rotate · Scroll to zoom</span>
           <button
             onClick={() => setSidebarOpen(s => !s)}
             className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
@@ -490,47 +461,46 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         </div>
       </div>
 
-      <div className="flex" style={{ height: expanded ? 'calc(100% - 40px)' : dimensions.height }}>
-        {/* Canvas */}
-        <div ref={containerRef} className="flex-1 relative">
-          <canvas
-            ref={canvasRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            className="w-full h-full"
-            onPointerMove={handlePointerMove}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onDoubleClick={handleDoubleClick}
-            onWheel={handleWheel}
-          />
+      <div className="flex" style={{ height: expanded ? 'calc(100% - 40px)' : graphHeight }}>
+        {/* 3D Canvas */}
+        <div className="flex-1 relative bg-muted/30">
+          <Canvas
+            camera={{ position: [0, 0, 25], fov: 60 }}
+            style={{ width: '100%', height: '100%' }}
+            dpr={[1, 2]}
+          >
+            <Scene
+              nodes={nodes}
+              links={links}
+              clusters={clusters}
+              hoveredNode={hoveredNode}
+              selectedNode={selectedNode}
+              onHover={setHoveredNode}
+              onSelect={handleSelect}
+              onDoubleClick={(slug) => navigate(`/d/${slug}`)}
+            />
+          </Canvas>
 
           {/* Legend overlay */}
           <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
             {clusters.map(c => (
               <span
                 key={c.id}
-                className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background: hslA(c.id, 0.2), color: c.color }}
+                className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm"
+                style={{ background: hslA(c.id, 0.15), color: c.color, border: `1px solid ${hslA(c.id, 0.3)}` }}
               >
                 {c.label}
               </span>
             ))}
           </div>
-
-          {/* Zoom indicator */}
-          <span className="absolute bottom-3 right-3 text-[10px] text-muted-foreground/50">
-            {Math.round(transform.k * 100)}%
-          </span>
         </div>
 
         {/* Insights sidebar — collapsible */}
         <div
           className={cn(
-            'border-l border-border/30 overflow-y-auto flex-shrink-0 transition-all duration-300',
+            'border-l border-border overflow-y-auto flex-shrink-0 transition-all duration-300 bg-card',
             sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
           )}
-          style={{ background: 'hsl(var(--graph-bg))' }}
         >
           <div className="p-3 space-y-4 w-64">
             {/* Main Topics */}
@@ -550,7 +520,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {clusters.flatMap(c => c.nodes.slice(0, 3)).map(n => (
-                  <span key={n.id} className="text-[9px] text-muted-foreground bg-accent px-1.5 py-0.5 rounded">
+                  <span key={n.id} className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                     {n.title.length > 20 ? n.title.slice(0, 18) + '…' : n.title}
                   </span>
                 ))}
@@ -590,7 +560,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
             {/* Selected node detail */}
             {selectedNodeData && (
-              <div className="border-t border-border/30 pt-3">
+              <div className="border-t border-border pt-3">
                 <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Selected</h4>
                 <p className="text-xs text-foreground font-medium">{selectedNodeData.title}</p>
                 <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
@@ -609,22 +579,22 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
             )}
 
             {/* Stats */}
-            <div className="border-t border-border/30 pt-3">
+            <div className="border-t border-border pt-3">
               <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h4>
               <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-accent rounded p-2">
+                <div className="bg-muted rounded p-2">
                   <div className="text-sm font-bold text-foreground">{topics.length}</div>
                   <div className="text-[9px] text-muted-foreground">Topics</div>
                 </div>
-                <div className="bg-accent rounded p-2">
+                <div className="bg-muted rounded p-2">
                   <div className="text-sm font-bold text-foreground">{relations.length}</div>
                   <div className="text-[9px] text-muted-foreground">Connections</div>
                 </div>
-                <div className="bg-accent rounded p-2">
+                <div className="bg-muted rounded p-2">
                   <div className="text-sm font-bold text-foreground">{clusters.length}</div>
                   <div className="text-[9px] text-muted-foreground">Clusters</div>
                 </div>
-                <div className="bg-accent rounded p-2">
+                <div className="bg-muted rounded p-2">
                   <div className="text-sm font-bold text-foreground">{gaps.length}</div>
                   <div className="text-[9px] text-muted-foreground">Gaps</div>
                 </div>
