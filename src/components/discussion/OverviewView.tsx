@@ -2,6 +2,30 @@ import { useMemo, useState } from 'react';
 import { Topic, ArgumentNode } from '@/types/discussion';
 import { cn } from '@/lib/utils';
 
+/** Renders summary text with inline [linked references](@postId) */
+function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: string) => void }) {
+  const parts = text.split(/(\[[^\]]+\]\(@[^)]+\))/g);
+  return (
+    <p className="text-sm leading-relaxed text-foreground/85">
+      {parts.map((part, i) => {
+        const match = part.match(/^\[([^\]]+)\]\(@([^)]+)\)$/);
+        if (match) {
+          return (
+            <button
+              key={i}
+              onClick={() => onClickRef(match[2])}
+              className="text-primary/80 hover:text-primary underline underline-offset-2 decoration-primary/30 hover:decoration-primary/60 transition-colors"
+            >
+              {match[1]}
+            </button>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </p>
+  );
+}
+
 interface Props {
   topic: Topic;
   onSwitchToThread?: (postId: string) => void;
@@ -139,7 +163,7 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
 
       {/* Summary */}
       <div className="surface-card-elevated p-4">
-        <p className="text-sm leading-relaxed text-foreground/85">{topic.summary.text}</p>
+        <SummaryText text={topic.summary.text} onClickRef={(postId) => onSwitchToThread?.(postId)} />
       </div>
 
       {/* Topic clusters */}
