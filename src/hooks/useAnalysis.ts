@@ -37,6 +37,7 @@ export interface AIAnalysis {
     suggestedType: string;
     confidence: number;
   }[];
+  argdown_source?: string;
 }
 
 /** Fetch cached analysis from DB */

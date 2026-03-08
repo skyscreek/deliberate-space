@@ -38,7 +38,6 @@ serve(async (req) => {
     if (postsErr) throw postsErr;
 
     if (!posts || posts.length === 0) {
-      // No posts, return empty analysis
       const emptyResult = {
         summary: "This discussion has no contributions yet.",
         tensions: [],
@@ -46,15 +45,10 @@ serve(async (req) => {
         open_questions: [],
         guidance: [],
         classifications: [],
+        argdown_source: "",
       };
-      // Store it
       await supabase.from("ai_analyses").upsert(
-        {
-          topic_id,
-          analysis_type: "full",
-          content: emptyResult,
-          model: "google/gemini-3-flash-preview",
-        },
+        { topic_id, analysis_type: "full", content: emptyResult, model: "google/gemini-3-flash-preview" },
         { onConflict: "topic_id,analysis_type" }
       );
       return new Response(JSON.stringify(emptyResult), {
@@ -79,7 +73,7 @@ serve(async (req) => {
       return `${indent}[${p.id}] ${author}${type} (score: ${p.score}): ${p.content}`;
     }).join("\n");
 
-    const prompt = `You are a deliberation analyst for a discussion platform. Analyze this discussion and return structured JSON.
+    const prompt = `You are a deliberation analyst. Analyze this discussion and return structured JSON.
 
 TOPIC: ${topic.title}
 CATEGORY: ${topic.category}
@@ -90,61 +84,52 @@ PROPOSAL: ${topic.proposal || ""}
 POSTS (format: [post_id] Author [type] (score): content):
 ${postTexts}
 
-Return ONLY valid JSON with this exact structure (no markdown, no code fences):
+Return ONLY valid JSON with this structure (no markdown, no code fences):
 {
-  "summary": "2-4 sentence summary of the discussion state, key positions, and progress toward resolution",
+  "summary": "2-4 sentence summary of the discussion state",
   "tensions": [
-    {
-      "id": "tension-1",
-      "label": "Short tension name",
-      "sideA": "Position A summary",
-      "sideB": "Position B summary",
-      "relatedPostIds": ["post-id-1", "post-id-2"]
-    }
+    { "id": "tension-1", "label": "Short name", "sideA": "Position A", "sideB": "Position B", "relatedPostIds": ["post-id"] }
   ],
   "clusters": [
-    {
-      "id": "cluster-1",
-      "name": "Cluster name",
-      "description": "What this cluster of arguments is about",
-      "postCount": 3,
-      "relatedPostIds": ["post-id-1", "post-id-2"]
-    }
+    { "id": "cluster-1", "name": "Name", "description": "Description", "postCount": 3, "relatedPostIds": ["post-id"] }
   ],
   "open_questions": [
-    {
-      "id": "q-1",
-      "question": "The open question text",
-      "raisedInPostId": "post-id",
-      "raisedBy": "Author Name",
-      "relatedPostIds": ["post-id-1"]
-    }
+    { "id": "q-1", "question": "Question text", "raisedInPostId": "post-id", "raisedBy": "Author", "relatedPostIds": ["post-id"] }
   ],
   "guidance": [
-    {
-      "id": "g-1",
-      "type": "evidence-needed|missing-perspective|missing-counterargument|missing-alternative|unresolved-question|gap|overrepresented",
-      "label": "Short actionable label",
-      "description": "What kind of contribution would help",
-      "targetPostId": "post-id or null",
-      "suggestedArgdownType": "evidence|support|objection|concern|alternative|question|proposal|rebuttal|claim"
-    }
+    { "id": "g-1", "type": "evidence-needed|missing-perspective|missing-counterargument|missing-alternative|unresolved-question|gap|overrepresented", "label": "Label", "description": "Description", "targetPostId": "post-id or null", "suggestedArgdownType": "claim|support|objection|concern|alternative|question|proposal|evidence|rebuttal" }
   ],
   "classifications": [
-    {
-      "postId": "post-id",
-      "suggestedType": "claim|support|objection|concern|alternative|question|proposal|evidence|rebuttal",
-      "confidence": 0.85
-    }
-  ]
+    { "postId": "post-id", "suggestedType": "claim|support|objection|concern|alternative|question|proposal|evidence|rebuttal", "confidence": 0.85 }
+  ],
+  "argdown_source": "ARGDOWN SYNTAX HERE - see rules below"
 }
 
-Rules:
-- Use ONLY post IDs that exist in the discussion above
+ARGDOWN SOURCE RULES:
+The argdown_source field must contain valid Argdown syntax (argdown.org) that reconstructs the argument structure of this discussion.
+Use these Argdown conventions:
+- [Statement Title]: Statement text — for statements/claims
+- <Argument Title>: Argument text — for arguments
+- + <Argument> — support relation
+- - <Argument> — attack/objection relation
+- Use #tags for topic clusters (e.g. #equity, #environment)
+- Reference post authors in parentheses after arguments, e.g. <Business Impact>(Marcus Johnson)
+- Keep it concise: summarize each post's core point as a statement or argument
+- Structure the debate hierarchically with the main claim at top
+- Use indentation for nested support/attack relations
+
+Example Argdown:
+[Main Claim]: Congestion pricing should be implemented. #policy
+  + <Evidence From Cities>(Maria): London and Stockholm saw 15-25% traffic reduction.
+    - <Infrastructure Gap>(Sarah): Those cities had better transit before pricing.
+  - <Business Burden>(Tom): Small businesses face $75/day in new delivery costs.
+    + <Consolidation Effect>(Chris): Delivery services adapt by consolidating trips.
+
+IMPORTANT:
+- Use ONLY real post IDs from the discussion
 - Return 2-5 tensions, 2-5 clusters, 2-5 open questions, 3-6 guidance items
-- Classifications: suggest types for posts that don't have one yet, or correct obviously wrong ones
-- Be specific and grounded in the actual content — don't invent positions not present
-- Guidance should be actionable and help diversify the discussion`;
+- Be specific and grounded in actual content
+- The argdown_source should capture ALL key arguments from the discussion`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -159,7 +144,7 @@ Rules:
           { role: "user", content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 4096,
+        max_tokens: 6000,
       }),
     });
 
@@ -169,14 +154,12 @@ Rules:
       console.error("AI gateway error:", status, text);
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (status === 402) {
         return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       throw new Error(`AI gateway error: ${status}`);
@@ -185,7 +168,6 @@ Rules:
     const aiData = await aiResponse.json();
     let content = aiData.choices?.[0]?.message?.content || "";
     
-    // Strip markdown fences and find JSON boundaries
     content = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
     const jsonStart = content.search(/[\{\[]/);
     if (jsonStart === -1) throw new Error("No JSON found in AI response");
@@ -197,34 +179,29 @@ Rules:
     try {
       analysis = JSON.parse(content);
     } catch (parseErr) {
-      // Attempt repair: trailing commas, control chars, unbalanced brackets
       let repaired = content
         .replace(/,\s*}/g, "}")
         .replace(/,\s*]/g, "]")
         .replace(/[\x00-\x1F\x7F]/g, "");
 
-      // Fix truncated arrays/objects by closing unbalanced delimiters
       const opens = (repaired.match(/{/g) || []).length;
       const closes = (repaired.match(/}/g) || []).length;
       const openBr = (repaired.match(/\[/g) || []).length;
       const closeBr = (repaired.match(/\]/g) || []).length;
-      // Remove any trailing comma before we close
       repaired = repaired.replace(/,\s*$/, "");
       for (let i = 0; i < openBr - closeBr; i++) repaired += "]";
       for (let i = 0; i < opens - closes; i++) repaired += "}";
-      // Clean again after appending
       repaired = repaired.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
 
       try {
         analysis = JSON.parse(repaired);
-        console.warn("AI response required JSON repair");
       } catch (finalErr) {
-        console.error("Failed to parse AI response even after repair:", content.substring(0, 500));
+        console.error("Failed to parse AI response:", content.substring(0, 500));
         throw new Error("AI returned invalid JSON");
       }
     }
 
-    // Store in ai_analyses — upsert by topic_id + analysis_type
+    // Store
     const { data: existing } = await supabase
       .from("ai_analyses")
       .select("id")
@@ -237,15 +214,12 @@ Rules:
         .from("ai_analyses")
         .update({ content: analysis, model: "google/gemini-3-flash-preview", created_at: new Date().toISOString() })
         .eq("id", existing.id);
-      if (updateErr) console.error("Failed to update ai_analyses:", JSON.stringify(updateErr));
+      if (updateErr) console.error("Failed to update:", JSON.stringify(updateErr));
     } else {
       const { error: insertErr } = await supabase.from("ai_analyses").insert({
-        topic_id,
-        analysis_type: "full",
-        content: analysis,
-        model: "google/gemini-3-flash-preview",
+        topic_id, analysis_type: "full", content: analysis, model: "google/gemini-3-flash-preview",
       });
-      if (insertErr) console.error("Failed to insert ai_analyses:", JSON.stringify(insertErr));
+      if (insertErr) console.error("Failed to insert:", JSON.stringify(insertErr));
     }
 
     return new Response(JSON.stringify(analysis), {
