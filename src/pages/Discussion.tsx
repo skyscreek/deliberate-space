@@ -558,7 +558,13 @@ function DiscussionContent() {
   const { data: analysisData } = useAnalysis(topicId);
   const [activeTab, setActiveTab] = useState('discussion');
   const [argMapFilter, setArgMapFilter] = useState<string | undefined>();
-  const { scrollToPost } = useDiscussion();
+  const { scrollToPost, activeFilter } = useDiscussion();
+
+  useEffect(() => {
+    if (activeFilter && activeTab !== 'discussion') {
+      setActiveTab('discussion');
+    }
+  }, [activeFilter, activeTab]);
 
   if (topicLoading) {
     return (

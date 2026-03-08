@@ -87,15 +87,18 @@ interface Props {
   topics: TopicRow[];
   relations: TopicRelation[];
   fullHeight?: boolean;
+  height?: string;
+  mode?: 'global' | 'local';
+  currentTopicId?: string;
   onSelectNode?: (nodeId: string | null, nodeData: NodeData | null) => void;
   onOpenDiscussion?: (slug: string) => void;
 }
 
-export default function TopicNetworkGraph({ topics, relations, fullHeight, onSelectNode, onOpenDiscussion }: Props) {
+export default function TopicNetworkGraph({ topics, relations, fullHeight, height, mode = 'global', currentTopicId, onSelectNode, onOpenDiscussion }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const graphRef = useRef<Graph | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<string | null>(mode === 'local' ? currentTopicId || null : null);
   const [expanded, setExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -200,7 +203,19 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     const graph = new Graph();
     graphRef.current = graph;
 
+    const includedNodes = new Set<string>();
+    if (mode === 'local' && currentTopicId) {
+      includedNodes.add(currentTopicId);
+      for (const r of relations) {
+        if (r.source_topic_id === currentTopicId) includedNodes.add(r.target_topic_id);
+        if (r.target_topic_id === currentTopicId) includedNodes.add(r.source_topic_id);
+      }
+    } else {
+      for (const t of topics) includedNodes.add(t.id);
+    }
+
     for (const t of topics) {
+      if (!includedNodes.has(t.id)) continue;
       const cl = clusterMap.get(t.category) ?? 0;
       const color = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
       graph.addNode(t.id, {
@@ -501,7 +516,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       fullHeight && 'h-full',
     )}>
       <div ref={containerRef} className="w-full h-full" style={{
-        minHeight: fullHeight ? undefined : expanded ? '100vh' : '560px',
+        minHeight: fullHeight ? undefined : expanded ? '100vh' : (height || '560px'),
         background: CANVAS_BG,
       }} />
 

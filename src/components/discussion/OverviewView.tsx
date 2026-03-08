@@ -1,11 +1,17 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Topic, ArgumentNode } from '@/types/discussion';
 import { useTopics } from '@/hooks/useTopics';
 import { useTopicRelations } from '@/hooks/useTopicRelations';
 import TopicNetworkGraph from '@/components/graphs/TopicNetworkGraph';
+import DiscussionSummary from '@/components/deliberation/DiscussionSummary';
+import TensionList from '@/components/deliberation/TensionList';
+import OpenQuestions from '@/components/deliberation/OpenQuestions';
+import EmergingProposals from '@/components/deliberation/EmergingProposals';
+import ClusterList from '@/components/deliberation/ClusterList';
 import { cn } from '@/lib/utils';
-import { Swords, HelpCircle, Lightbulb } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Map } from 'lucide-react';
 
 interface Props {
   topic: Topic;
@@ -17,119 +23,81 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
   const { data: allTopics } = useTopics();
   const { data: relations } = useTopicRelations();
   const navigate = useNavigate();
+  const [graphOpen, setGraphOpen] = useState(true);
 
-  const handleOpenDiscussion = useCallback((slug: string) => {
+  const handleOpenDiscussion = (slug: string) => {
     navigate(`/d/${slug}`);
-  }, [navigate]);
-
-  const argCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    function walk(n: ArgumentNode) {
-      counts[n.type] = (counts[n.type] || 0) + 1;
-      n.children.forEach(walk);
-    }
-    topic.argumentMap.forEach(walk);
-    return counts;
-  }, [topic.argumentMap]);
-
-  const colorMap: Record<string, string> = {
-    claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
-    concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
-    proposal: 'bg-argdown-proposal',
   };
-  const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
+
   const hasGraph = allTopics && allTopics.length >= 2;
-  const hasTensions = topic.tensions.length > 0;
-  const hasQuestions = topic.openQuestions.length > 0;
-  const hasProposals = topic.emergingProposals.length > 0;
-  const hasContextBar = hasTensions || hasQuestions || hasProposals || total > 0;
 
   return (
-    <div className="relative">
-      {hasGraph ? (
-        <div style={{ height: '640px' }} className="rounded-xl overflow-hidden">
-          <TopicNetworkGraph
-            topics={allTopics!}
-            relations={relations ?? []}
-            fullHeight
-            onOpenDiscussion={handleOpenDiscussion}
-          />
-        </div>
-      ) : (
-        <div className="surface-card-elevated p-12 text-center">
-          <p className="text-sm text-muted-foreground">Create more topics to see the discourse network.</p>
-        </div>
+    <div className="space-y-6 pb-12 animate-in fade-in duration-300">
+      
+      {/* 1. Summary Module */}
+      {topic.summary && topic.summary.text && (
+        <section className="surface-card p-5 rounded-xl border border-border/40">
+          <DiscussionSummary summary={topic.summary.text} />
+        </section>
       )}
 
-      {hasContextBar && (
-        <div className="mt-2 bg-card/80 border border-border/50 rounded-lg px-4 py-2.5 space-y-2">
-          {total > 0 && (
-            <div className="flex items-center gap-3">
-              <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden flex-1">
-                {Object.entries(argCounts).map(([type, count]) => (
-                  <button
-                    key={type}
-                    className={cn('h-full transition-all cursor-pointer hover:opacity-80', colorMap[type] || 'bg-muted')}
-                    style={{ width: `${(count / total) * 100}%` }}
-                    title={`${type}: ${count}`}
-                    onClick={() => onSwitchToArgType?.(type)}
-                  />
-                ))}
-              </div>
-              <div className="flex gap-1.5 shrink-0">
-                {Object.entries(argCounts).slice(0, 5).map(([type]) => (
-                  <span key={type} className="flex items-center gap-0.5 text-[9px] text-muted-foreground capitalize">
-                    <span className={cn('w-1.5 h-1.5 rounded-full', colorMap[type])} />{type}
-                  </span>
-                ))}
-              </div>
+      {/* 2. Graph Module (Local Context) */}
+      {hasGraph && (
+        <Collapsible open={graphOpen} onOpenChange={setGraphOpen} className="surface-card rounded-xl border border-border/40 overflow-hidden">
+          <CollapsibleTrigger className="flex w-full items-center justify-between p-3 bg-muted/20 hover:bg-muted/40 transition-colors">
+            <div className="flex items-center gap-2">
+              <Map className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium">Local Topic Network</h3>
             </div>
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", graphOpen && "rotate-180")} />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <TopicNetworkGraph
+              topics={allTopics!}
+              relations={relations ?? []}
+              mode="local"
+              currentTopicId={topic.id}
+              height="320px"
+              onOpenDiscussion={handleOpenDiscussion}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* 3. Rich Overview Modules */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        {/* Left Column: Tensions & Questions */}
+        <div className="space-y-4">
+          {topic.tensions.length > 0 && (
+            <section className="surface-card p-4 rounded-xl border border-border/40">
+              <TensionList tensions={topic.tensions} />
+            </section>
           )}
 
-          <div className={cn('flex gap-4 flex-wrap', !hasTensions && !hasQuestions && 'hidden')}>
-            {hasTensions && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] font-semibold text-muted-foreground uppercase flex items-center gap-0.5">
-                  <Swords className="h-2.5 w-2.5 text-argdown-concern" /> Tensions
-                </span>
-                {topic.tensions.slice(0, 2).map(t => (
-                  <button key={t.id} onClick={() => t.relatedPostIds[0] && onSwitchToThread?.(t.relatedPostIds[0])}
-                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full">
-                    {t.sideA.slice(0, 25)}… <span className="text-argdown-concern font-bold">vs</span> {t.sideB.slice(0, 25)}…
-                  </button>
-                ))}
-              </div>
-            )}
-            {hasQuestions && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] font-semibold text-muted-foreground uppercase flex items-center gap-0.5">
-                  <HelpCircle className="h-2.5 w-2.5 text-argdown-question" /> Open
-                </span>
-                {topic.openQuestions.slice(0, 2).map(q => (
-                  <button key={q.id} onClick={() => onSwitchToThread?.(q.raisedInPostId)}
-                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full truncate max-w-[200px]">
-                    {q.question}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {hasProposals && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[9px] font-semibold text-muted-foreground uppercase flex items-center gap-0.5">
-                <Lightbulb className="h-2.5 w-2.5 text-argdown-proposal" /> Proposals
-              </span>
-              {topic.emergingProposals.map(ep => (
-                <button key={ep.id} onClick={() => ep.relatedPostIds[0] && onSwitchToThread?.(ep.relatedPostIds[0])}
-                  className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-argdown-proposal/8 hover:bg-argdown-proposal/15 border border-argdown-proposal/15 px-2 py-0.5 rounded-full">
-                  {ep.title}
-                </button>
-              ))}
-            </div>
+          {topic.openQuestions.length > 0 && (
+            <section className="surface-card p-4 rounded-xl border border-border/40">
+              <OpenQuestions questions={topic.openQuestions} />
+            </section>
           )}
         </div>
-      )}
+
+        {/* Right Column: Proposals & Clusters */}
+        <div className="space-y-4">
+          {topic.emergingProposals && topic.emergingProposals.length > 0 && (
+            <section className="surface-card p-4 rounded-xl border border-border/40">
+              <EmergingProposals proposals={topic.emergingProposals} />
+            </section>
+          )}
+
+          {topic.clusters && topic.clusters.length > 0 && (
+            <section className="surface-card p-4 rounded-xl border border-border/40">
+              <ClusterList clusters={topic.clusters} />
+            </section>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
