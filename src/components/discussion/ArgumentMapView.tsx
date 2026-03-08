@@ -107,9 +107,9 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
 
 type FilterType = 'all' | ArgumentNode['type'];
 
-export default function ArgumentMapView({ nodes, onSwitchToThread }: { nodes: ArgumentNode[]; onSwitchToThread?: (postId: string) => void }) {
+export default function ArgumentMapView({ nodes, onSwitchToThread, initialFilter }: { nodes: ArgumentNode[]; onSwitchToThread?: (postId: string) => void; initialFilter?: string }) {
   const { scrollToPost } = useDiscussion();
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter] = useState<FilterType>(initialFilter as FilterType || 'all');
 
   const switchToThread = (postId: string) => {
     if (onSwitchToThread) onSwitchToThread(postId);
