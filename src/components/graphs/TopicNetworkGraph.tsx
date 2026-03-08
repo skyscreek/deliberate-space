@@ -298,8 +298,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       },
     });
 
-    // Custom label renderer — no background box
-    function drawLabel(
+    // Custom label draw — no background box, text shadow for readability
+    function drawNodeLabel(
       context: CanvasRenderingContext2D,
       data: any,
       settings: any,
@@ -307,13 +307,13 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       if (!data.label) return;
       const size = settings.labelSize;
       const font = settings.labelFont;
-      const weight = settings.labelWeight || 'normal';
+      const weight = settings.labelWeight || '500';
       context.font = `${weight} ${size}px ${font}`;
-      context.fillStyle = data.forceLabel
-        ? 'hsla(220, 10%, 85%, 0.95)'
-        : 'hsla(220, 10%, 75%, 0.7)';
-      context.shadowColor = 'hsla(222, 10%, 5%, 0.8)';
-      context.shadowBlur = 4;
+      context.fillStyle = (data as any).forceLabel
+        ? 'hsla(220, 10%, 88%, 0.95)'
+        : 'hsla(220, 10%, 75%, 0.75)';
+      context.shadowColor = 'hsla(222, 10%, 5%, 0.9)';
+      context.shadowBlur = 5;
       context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
       context.shadowColor = 'transparent';
       context.shadowBlur = 0;
@@ -328,7 +328,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       labelSize: 11,
       labelWeight: '500',
       labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
-      labelRenderer: drawLabel,
+      defaultDrawNodeLabel: drawNodeLabel,
       stagePadding: 60,
       labelRenderedSizeThreshold: 7,
       defaultNodeColor: '#556677',
