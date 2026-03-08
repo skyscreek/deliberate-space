@@ -1,6 +1,6 @@
 import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function UserMenu() {
@@ -24,12 +24,14 @@ export default function UserMenu() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">
-        {initials}
-      </div>
-      <span className="text-xs font-medium text-foreground hidden sm:block max-w-[100px] truncate">
-        {profile?.display_name || user.email}
-      </span>
+      <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">
+          {initials}
+        </div>
+        <span className="text-xs font-medium text-foreground hidden sm:block max-w-[100px] truncate">
+          {profile?.display_name || user.email}
+        </span>
+      </Link>
       <button
         onClick={signOut}
         className="text-muted-foreground hover:text-foreground transition-colors p-1"
