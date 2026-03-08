@@ -298,6 +298,27 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       },
     });
 
+    // Custom label renderer — no background box
+    function drawLabel(
+      context: CanvasRenderingContext2D,
+      data: any,
+      settings: any,
+    ) {
+      if (!data.label) return;
+      const size = settings.labelSize;
+      const font = settings.labelFont;
+      const weight = settings.labelWeight || 'normal';
+      context.font = `${weight} ${size}px ${font}`;
+      context.fillStyle = data.forceLabel
+        ? 'hsla(220, 10%, 85%, 0.95)'
+        : 'hsla(220, 10%, 75%, 0.7)';
+      context.shadowColor = 'hsla(222, 10%, 5%, 0.8)';
+      context.shadowBlur = 4;
+      context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
+      context.shadowColor = 'transparent';
+      context.shadowBlur = 0;
+    }
+
     // ─── Sigma ───
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
@@ -307,6 +328,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       labelSize: 11,
       labelWeight: '500',
       labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
+      labelRenderer: drawLabel,
       stagePadding: 60,
       labelRenderedSizeThreshold: 7,
       defaultNodeColor: '#556677',
