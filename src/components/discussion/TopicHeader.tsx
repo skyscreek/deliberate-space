@@ -55,7 +55,7 @@ export default function TopicHeader({ topic }: { topic: TopicMeta }) {
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <div className="rounded-md bg-card px-3.5 py-3 mt-1 border border-border/40">
+          <div className="surface-card-elevated px-4 py-3.5 mt-1">
             {topic.proposal.split('\n').filter(Boolean).map((para, i) => (
               <p key={i} className="text-sm leading-relaxed text-foreground/80 mb-1.5 last:mb-0">{para}</p>
             ))}
