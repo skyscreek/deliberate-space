@@ -19,25 +19,30 @@ export interface TopicRow {
 }
 
 async function fetchTopics(): Promise<TopicRow[]> {
-  // Fetch topics with author profile
   const { data: topics, error } = await supabase
     .from('topics')
-    .select('*, profiles!inner(display_name, avatar_url)')
+    .select('*')
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
+  if (!topics || topics.length === 0) return [];
 
-  // Fetch post counts and participant counts per topic
-  const topicIds = (topics || []).map(t => t.id);
-  
-  if (topicIds.length === 0) return [];
+  // Fetch author profiles
+  const authorIds = [...new Set(topics.map(t => t.author_id))];
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', authorIds);
 
-  // Get post counts and distinct authors per topic
-  const { data: postStats, error: postError } = await supabase
+  const profileMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  for (const p of profiles || []) {
+    profileMap.set(p.user_id, { display_name: p.display_name, avatar_url: p.avatar_url });
+  }
+
+  // Fetch post stats
+  const { data: postStats } = await supabase
     .from('posts')
     .select('topic_id, author_id, created_at');
-
-  if (postError) throw postError;
 
   const statsMap = new Map<string, { postCount: number; participants: Set<string>; lastActivity: string }>();
   for (const p of postStats || []) {
@@ -50,12 +55,11 @@ async function fetchTopics(): Promise<TopicRow[]> {
     if (p.created_at > s.lastActivity) s.lastActivity = p.created_at;
   }
 
-  return (topics || []).map(t => {
-    const profile = (t as any).profiles;
+  return topics.map(t => {
     const stats = statsMap.get(t.id);
     return {
       ...t,
-      author_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+      author_profile: profileMap.get(t.author_id),
       post_count: stats?.postCount ?? 0,
       participant_count: stats?.participants.size ?? 0,
       last_activity: stats?.lastActivity ?? t.updated_at,
@@ -70,19 +74,25 @@ export function useTopics() {
   });
 }
 
-async function fetchTopic(id: string) {
+async function fetchTopic(id: string): Promise<TopicRow> {
   const { data, error } = await supabase
     .from('topics')
-    .select('*, profiles!inner(display_name, avatar_url)')
+    .select('*')
     .eq('id', id)
     .single();
 
   if (error) throw error;
-  const profile = (data as any).profiles;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name, avatar_url')
+    .eq('user_id', data.author_id)
+    .single();
+
   return {
     ...data,
     author_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
-  } as TopicRow;
+  };
 }
 
 export function useTopic(id: string | undefined) {
