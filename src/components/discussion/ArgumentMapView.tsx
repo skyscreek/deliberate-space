@@ -30,7 +30,7 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
 
       <div className={cn('rounded-md border shadow-sm transition-all', config.bg, config.border)}>
         <div
-          className={cn('flex items-start gap-2 px-3 py-2.5', hasChildren && 'cursor-pointer')}
+          className={cn('flex items-start gap-2 px-3 py-3.5', hasChildren && 'cursor-pointer')}
           onClick={() => hasChildren && setExpanded(!expanded)}
         >
           {hasChildren && (
