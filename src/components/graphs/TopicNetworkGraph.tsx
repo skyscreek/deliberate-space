@@ -243,7 +243,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       const cy = cluster.cy;
       const spread = Math.max(60, cluster.nodes.length * 25);
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, spread);
-      grad.addColorStop(0, cluster.color.replace(')', ' / 0.06)').replace('hsl(', 'hsla('));
+      grad.addColorStop(0, hslA(cluster.id, 0.06));
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.beginPath();
@@ -291,7 +291,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       // Glow for hovered/selected
       if (isHovered || isSelected) {
         const glow = ctx.createRadialGradient(node.x, node.y, r, node.x, node.y, r * 3);
-        glow.addColorStop(0, color.replace(')', ' / 0.35)').replace('hsl(', 'hsla('));
+        glow.addColorStop(0, hslA(node.cluster, 0.35));
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.beginPath();
@@ -337,7 +337,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       ctx.font = `700 ${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = cluster.color.replace(')', ' / 0.25)').replace('hsl(', 'hsla(');
+      ctx.fillStyle = hslA(cluster.id, 0.25);
       ctx.fillText(cluster.label, cluster.cx, cluster.cy - 35);
     }
 
