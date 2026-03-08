@@ -90,7 +90,7 @@ export const congestionTopic: Topic = {
   proposal: `The city council is considering a congestion pricing zone covering the downtown core. Vehicles entering the zone during peak hours (7–10 AM, 4–7 PM) would pay a $9 daily fee. Revenue would fund public transit expansion and cycling infrastructure.\n\nThis discussion aims to gather community perspectives before the public hearing on April 15th. We want to understand: Who benefits? Who is harmed? What conditions would make this acceptable? What alternatives should be considered?`,
 
   summary: {
-    text: 'The discussion is polarized between economic concerns and environmental benefits. There is emerging agreement that exemptions and revenue allocation are key design questions. A phased approach is gaining traction as a compromise.',
+    text: 'The discussion is polarized between economic concerns and environmental benefits. Some participants argue that [international evidence supports significant traffic reduction](@p1), while others see the fee as [a regressive tax on commuters who lack transit alternatives](@p2). There is emerging agreement that [health costs of inaction disproportionately affect vulnerable communities](@p3), and that [the economic impact on small businesses needs attention](@p4). A [phased approach starting with lower fees](@p10) is gaining traction as a potential compromise.',
     positions: [
       { authorName: 'Maria Chen', position: 'Supports pricing based on international evidence showing 15–25% traffic reduction', postId: 'p1' },
       { authorName: 'James Okafor', position: 'Opposes the fee as a regressive tax on commuters without transit alternatives', postId: 'p2' },

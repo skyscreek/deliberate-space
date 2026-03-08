@@ -22,6 +22,30 @@ interface Props {
   guidance: GuidanceItem[];
 }
 
+/** Renders summary text with inline [linked references](@postId) */
+function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: string) => void }) {
+  const parts = text.split(/(\[[^\]]+\]\(@[^)]+\))/g);
+  return (
+    <p className="text-sm leading-relaxed text-foreground/85">
+      {parts.map((part, i) => {
+        const match = part.match(/^\[([^\]]+)\]\(@([^)]+)\)$/);
+        if (match) {
+          return (
+            <button
+              key={i}
+              onClick={() => onClickRef(match[2])}
+              className="text-primary/80 hover:text-primary underline underline-offset-2 decoration-primary/30 hover:decoration-primary/60 transition-colors"
+            >
+              {match[1]}
+            </button>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </p>
+  );
+}
+
 export default function DiscussionOverview({ summary, tensions, openQuestions, guidance }: Props) {
   const { activeFilter, setFilter, scrollToPost, startAssistedComment } = useDiscussion();
   const [open, setOpen] = useState(true);
@@ -60,20 +84,7 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
             <span className="font-semibold text-foreground">Summary</span>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-3">
-            <p className="text-sm leading-relaxed text-foreground/85">{summary.text}</p>
-            {summary.positions.length > 0 && (
-              <div className="mt-2.5 space-y-0.5">
-                {summary.positions.slice(0, 4).map((p) => (
-                  <button
-                    key={p.postId}
-                    onClick={() => scrollToPost(p.postId)}
-                    className="w-full text-left text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded hover:bg-accent/40 transition-colors"
-                  >
-                    <span className="text-foreground/80 font-medium">{p.authorName}</span> — {p.position.length > 70 ? p.position.slice(0, 70) + '…' : p.position}
-                  </button>
-                ))}
-              </div>
-            )}
+            <SummaryText text={summary.text} onClickRef={scrollToPost} />
           </AccordionContent>
         </AccordionItem>
 
