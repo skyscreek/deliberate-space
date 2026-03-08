@@ -6,11 +6,14 @@ interface DiscussionContextType {
   activeFilter: ActiveFilter | null;
   scrollToPostId: string | null;
   assistedComment: AssistedComment | null;
+  replyingToPostId: string | null;
   setFilter: (filter: ActiveFilter | null) => void;
   scrollToPost: (postId: string) => void;
   clearScrollTarget: () => void;
   startAssistedComment: (comment: AssistedComment) => void;
   clearAssistedComment: () => void;
+  startReply: (postId: string, authorName: string, excerpt: string) => void;
+  clearReply: () => void;
 }
 
 const DiscussionContext = createContext<DiscussionContextType | undefined>(undefined);
@@ -19,6 +22,7 @@ export function DiscussionProvider({ children }: { children: React.ReactNode }) 
   const [activeFilter, setActiveFilter] = useState<ActiveFilter | null>(null);
   const [scrollToPostId, setScrollToPostId] = useState<string | null>(null);
   const [assistedComment, setAssistedComment] = useState<AssistedComment | null>(null);
+  const [replyingToPostId, setReplyingToPostId] = useState<string | null>(null);
 
   const setFilter = useCallback((filter: ActiveFilter | null) => {
     setActiveFilter(filter);
@@ -34,6 +38,7 @@ export function DiscussionProvider({ children }: { children: React.ReactNode }) 
 
   const startAssistedComment = useCallback((comment: AssistedComment) => {
     setAssistedComment(comment);
+    setReplyingToPostId(comment.replyToPostId || comment.targetPostId || null);
     if (comment.targetPostId) {
       setScrollToPostId(comment.targetPostId);
     }
@@ -41,14 +46,34 @@ export function DiscussionProvider({ children }: { children: React.ReactNode }) 
 
   const clearAssistedComment = useCallback(() => {
     setAssistedComment(null);
+    setReplyingToPostId(null);
+  }, []);
+
+  const startReply = useCallback((postId: string, authorName: string, excerpt: string) => {
+    setReplyingToPostId(postId);
+    setAssistedComment({
+      guidanceId: `reply-${postId}`,
+      replyToPostId: postId,
+      replyToAuthor: authorName,
+      replyToExcerpt: excerpt,
+      label: `Replying to ${authorName}`,
+      description: excerpt.length > 120 ? excerpt.slice(0, 120) + '…' : excerpt,
+      suggestedArgdownType: undefined,
+    });
+  }, []);
+
+  const clearReply = useCallback(() => {
+    setReplyingToPostId(null);
+    setAssistedComment(null);
   }, []);
 
   const highlightedPostIds = activeFilter?.relatedPostIds ?? [];
 
   return (
     <DiscussionContext.Provider value={{
-      highlightedPostIds, activeFilter, scrollToPostId, assistedComment,
+      highlightedPostIds, activeFilter, scrollToPostId, assistedComment, replyingToPostId,
       setFilter, scrollToPost, clearScrollTarget, startAssistedComment, clearAssistedComment,
+      startReply, clearReply,
     }}>
       {children}
     </DiscussionContext.Provider>
