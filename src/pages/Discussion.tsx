@@ -37,9 +37,7 @@ export default function Discussion() {
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
             <Link to="/" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-                <MessageSquare className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
+              <Sparkles className="h-5 w-5 text-primary" />
               <span className="font-bold text-sm text-foreground">Delibera</span>
             </Link>
 
