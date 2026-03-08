@@ -7,7 +7,7 @@ import {
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
+import { Network, Lightbulb, ChevronRight, ChevronLeft, Maximize2, Minimize2, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 /* ── Cluster colours (raw HSL for Canvas API — CSS var() doesn't work in Canvas) ── */
 const CLUSTER_COLORS_HSL: [number, number, number][] = [
