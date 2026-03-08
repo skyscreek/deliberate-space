@@ -9,15 +9,17 @@ import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
 import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 
-/* ── Cluster colours (match CSS tokens) ── */
-const CLUSTER_COLORS = [
-  'hsl(var(--graph-cluster-1))',
-  'hsl(var(--graph-cluster-2))',
-  'hsl(var(--graph-cluster-3))',
-  'hsl(var(--graph-cluster-4))',
-  'hsl(var(--graph-cluster-5))',
-  'hsl(var(--graph-cluster-6))',
+/* ── Cluster colours (raw HSL for Canvas API — CSS var() doesn't work in Canvas) ── */
+const CLUSTER_COLORS_HSL: [number, number, number][] = [
+  [340, 70, 55], [160, 60, 45], [45, 80, 55],
+  [270, 55, 58], [195, 70, 50], [15, 75, 55],
 ];
+const CLUSTER_COLORS = CLUSTER_COLORS_HSL.map(([h, s, l]) => `hsl(${h}, ${s}%, ${l}%)`);
+
+function hslA(idx: number, alpha: number) {
+  const [h, s, l] = CLUSTER_COLORS_HSL[idx % CLUSTER_COLORS_HSL.length];
+  return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+}
 
 /* ── Types ── */
 interface GraphNode extends SimulationNodeDatum {
