@@ -45,7 +45,7 @@ function TopicCardLive({ topic }: { topic: TopicRow }) {
           <p className="text-sm text-muted-foreground leading-relaxed mb-3 line-clamp-2">{topic.description}</p>
         )}
         <div className="flex items-center gap-3.5 text-xs text-muted-foreground flex-wrap">
-          <Link to={`/profile/${topic.author_id}`} className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+          <Link to={`/u/${topic.author_profile?.username || topic.author_id}`} className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
             <div className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold text-primary-foreground bg-primary shrink-0">
               {initials}
             </div>
