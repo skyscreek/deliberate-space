@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Topic, ArgumentNode } from '@/types/discussion';
 import { cn } from '@/lib/utils';
 
