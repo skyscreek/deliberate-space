@@ -2,15 +2,16 @@ import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Graph from 'graphology';
 import Sigma from 'sigma';
+import { NodeDisplayData, EdgeDisplayData } from 'sigma/types';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { circular } from 'graphology-layout';
 import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Network, Maximize2, Minimize2, Search, X, ChevronRight, ExternalLink, Lightbulb } from 'lucide-react';
+import { Search, X, ChevronRight, ExternalLink, Maximize2, Minimize2, MessageSquare } from 'lucide-react';
 
-/* ── Cluster colours from design tokens ── */
+/* ── Cluster colours ── */
 const CLUSTER_PALETTE = [
   'hsl(340, 70%, 55%)', 'hsl(160, 60%, 45%)', 'hsl(45, 80%, 55%)',
   'hsl(270, 55%, 58%)', 'hsl(195, 70%, 50%)', 'hsl(15, 75%, 55%)',
@@ -39,11 +40,11 @@ function hexFromHsl(hslStr: string): string {
       if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
       return p;
     };
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
+    const q2 = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q2;
+    r = hue2rgb(p, q2, h + 1/3);
+    g = hue2rgb(p, q2, h);
+    b = hue2rgb(p, q2, h - 1/3);
   }
   const toHex = (x: number) => {
     const hex = Math.round(x * 255).toString(16);
@@ -52,8 +53,13 @@ function hexFromHsl(hslStr: string): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+function hexWithAlpha(hex: string, alpha: number): string {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return hex.length === 7 ? hex + a : hex.slice(0, 7) + a;
+}
+
 /* ── Types ── */
-interface NodeData {
+export interface NodeData {
   id: string;
   slug: string;
   title: string;
@@ -61,31 +67,26 @@ interface NodeData {
   postCount: number;
   status: string;
   cluster: number;
+  degree: number;
+  neighbors: string[];
+  neighborTitles: string[];
 }
 
 interface ClusterInfo {
   id: number;
   label: string;
   color: string;
+  hex: string;
   nodeCount: number;
   totalPosts: number;
-}
-
-interface GapInfo {
-  a: ClusterInfo;
-  b: ClusterInfo;
-  linkCount: number;
 }
 
 /* ── Main component ── */
 interface Props {
   topics: TopicRow[];
   relations: TopicRelation[];
-  /** When in full overview mode, fill parent */
   fullHeight?: boolean;
-  /** Called when user selects a node */
   onSelectNode?: (nodeId: string | null, nodeData: NodeData | null) => void;
-  /** Called when user wants to open a discussion */
   onOpenDiscussion?: (slug: string) => void;
 }
 
@@ -93,16 +94,19 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const graphRef = useRef<Graph | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
 
+  // Refs for reducers (avoid stale closures)
+  const hoveredRef = useRef<string | null>(null);
+  const selectedRef = useRef<string | null>(null);
+  selectedRef.current = selectedNode;
+
   const clusterMap = useMemo(() => assignClusterColors(topics.map(t => t.category)), [topics]);
 
-  // Build clusters info
   const clusters = useMemo<ClusterInfo[]>(() => {
     const groups = new Map<number, { label: string; count: number; posts: number }>();
     for (const t of topics) {
@@ -113,63 +117,41 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       g.posts += t.post_count || 0;
     }
     return Array.from(groups.entries()).map(([id, g]) => ({
-      id, label: g.label, color: CLUSTER_PALETTE[id % CLUSTER_PALETTE.length],
+      id, label: g.label,
+      color: CLUSTER_PALETTE[id % CLUSTER_PALETTE.length],
+      hex: hexFromHsl(CLUSTER_PALETTE[id % CLUSTER_PALETTE.length]),
       nodeCount: g.count, totalPosts: g.posts,
     })).sort((a, b) => b.totalPosts - a.totalPosts);
   }, [topics, clusterMap]);
 
-  // Build gaps
-  const gaps = useMemo<GapInfo[]>(() => {
-    if (clusters.length < 2) return [];
-    const clusterById = new Map(clusters.map(c => [c.id, c]));
-    const topicCluster = new Map(topics.map(t => [t.id, clusterMap.get(t.category) ?? 0]));
-    const interLinks = new Map<string, number>();
-
-    for (const r of relations) {
-      const src = topicCluster.get(r.source_topic_id);
-      const tgt = topicCluster.get(r.target_topic_id);
-      if (src !== undefined && tgt !== undefined && src !== tgt) {
-        const key = [Math.min(src, tgt), Math.max(src, tgt)].join('-');
-        interLinks.set(key, (interLinks.get(key) ?? 0) + 1);
-      }
-    }
-
-    const result: GapInfo[] = [];
-    for (let i = 0; i < clusters.length; i++) {
-      for (let j = i + 1; j < clusters.length; j++) {
-        const key = [Math.min(clusters[i].id, clusters[j].id), Math.max(clusters[i].id, clusters[j].id)].join('-');
-        const count = interLinks.get(key) ?? 0;
-        if (count <= 1) {
-          result.push({
-            a: clusterById.get(clusters[i].id)!,
-            b: clusterById.get(clusters[j].id)!,
-            linkCount: count,
-          });
-        }
-      }
-    }
-    return result.sort((a, b) => a.linkCount - b.linkCount).slice(0, 4);
-  }, [clusters, topics, relations, clusterMap]);
-
-  // Selected node data
+  // Build selectedNodeData including neighbors
   const selectedNodeData = useMemo<NodeData | null>(() => {
     if (!selectedNode) return null;
     const t = topics.find(t => t.id === selectedNode);
+    const graph = graphRef.current;
     if (!t) return null;
+    const neighbors = graph && graph.hasNode(selectedNode) ? graph.neighbors(selectedNode) : [];
+    const neighborTitles = neighbors.map(nid => {
+      const nt = topics.find(x => x.id === nid);
+      return nt?.title || '';
+    }).filter(Boolean);
     return {
       id: t.id, slug: t.slug, title: t.title, category: t.category,
       postCount: t.post_count || 0, status: t.status, cluster: clusterMap.get(t.category) ?? 0,
+      degree: neighbors.length, neighbors, neighborTitles,
     };
   }, [selectedNode, topics, clusterMap]);
 
-  // Search filtered nodes
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
     return topics.filter(t => t.title.toLowerCase().includes(q)).slice(0, 8);
   }, [searchQuery, topics]);
 
-  // Build graph and sigma
+  // Compute which nodes are "important" — top N by degree
+  const importantNodes = useRef<Set<string>>(new Set());
+
+  // ─── Build graph + Sigma ───
   useEffect(() => {
     if (!containerRef.current || topics.length === 0) return;
 
@@ -179,16 +161,19 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     // Add nodes
     for (const t of topics) {
       const cluster = clusterMap.get(t.category) ?? 0;
+      const hex = hexFromHsl(CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length]);
       graph.addNode(t.id, {
         label: t.title,
-        size: Math.max(4, Math.min(25, 4 + (t.post_count || 0) * 1.5)),
-        color: hexFromHsl(CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length]),
-        // Store extra data
+        size: Math.max(5, Math.min(30, 5 + (t.post_count || 0) * 2)),
+        color: hex,
+        originalColor: hex,
         slug: t.slug,
         category: t.category,
         postCount: t.post_count || 0,
         status: t.status,
         cluster,
+        // forceLabel will be set after centrality
+        forceLabel: false,
       });
     }
 
@@ -199,123 +184,163 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         const srcCluster = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
         const tgtCluster = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
         const sameCluster = srcCluster === tgtCluster;
-        
+        const srcHex = hexFromHsl(CLUSTER_PALETTE[srcCluster % CLUSTER_PALETTE.length]);
         try {
           graph.addEdge(r.source_topic_id, r.target_topic_id, {
-            size: sameCluster ? 2 : 1,
-            color: sameCluster
-              ? hexFromHsl(CLUSTER_PALETTE[srcCluster % CLUSTER_PALETTE.length]) + '66'
-              : '#88888833',
+            size: sameCluster ? 1.5 : 0.8,
+            color: sameCluster ? hexWithAlpha(srcHex, 0.35) : '#88888822',
+            originalColor: sameCluster ? hexWithAlpha(srcHex, 0.35) : '#88888822',
             type: 'line',
           });
-        } catch {
-          // Edge may already exist
-        }
+        } catch { /* edge exists */ }
       }
     }
 
-    // Apply circular layout first, then ForceAtlas2
+    // Layout
     circular.assign(graph, { scale: 100 });
 
-    // Compute degree centrality for sizing
+    // Degree centrality for sizing + importance
     try {
       const centralities = degreeCentrality(graph);
+      const sorted = Object.entries(centralities).sort((a, b) => b[1] - a[1]);
+      const topN = Math.max(3, Math.ceil(topics.length * 0.25));
+      const important = new Set(sorted.slice(0, topN).map(([id]) => id));
+      importantNodes.current = important;
+
       graph.forEachNode((node) => {
         const currentSize = graph.getNodeAttribute(node, 'size') as number;
         const centrality = centralities[node] || 0;
-        graph.setNodeAttribute(node, 'size', Math.max(4, currentSize + centrality * 20));
+        const newSize = Math.max(5, currentSize + centrality * 25);
+        graph.setNodeAttribute(node, 'size', newSize);
+        graph.setNodeAttribute(node, 'forceLabel', important.has(node));
       });
-    } catch {
-      // metrics may fail on disconnected graphs
-    }
+    } catch { /* ok */ }
 
-    // Run ForceAtlas2
+    // ForceAtlas2
     forceAtlas2.assign(graph, {
-      iterations: 100,
+      iterations: 150,
       settings: {
-        gravity: 1,
-        scalingRatio: 10,
+        gravity: 1.5,
+        scalingRatio: 12,
         barnesHutOptimize: true,
         barnesHutTheta: 0.5,
         strongGravityMode: false,
-        slowDown: 5,
+        slowDown: 8,
         outboundAttractionDistribution: true,
+        linLogMode: true,
       },
     });
 
-    // Create Sigma
+    // ─── Sigma renderer ───
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
       enableEdgeEvents: false,
       defaultEdgeType: 'line',
-      labelFont: 'Inter, system-ui, -apple-system, sans-serif',
-      labelSize: 12,
+      labelFont: "'Inter', system-ui, sans-serif",
+      labelSize: 11,
       labelWeight: '500',
-      labelColor: { color: '#374151' },
-      stagePadding: 40,
-      labelRenderedSizeThreshold: 6,
-      nodeProgramClasses: {},
-      defaultNodeColor: '#888',
+      labelColor: { color: '#555' },
+      stagePadding: 60,
+      // Only show labels for large / important nodes at default zoom
+      labelRenderedSizeThreshold: 10,
+      defaultNodeColor: '#aaa',
       defaultEdgeColor: '#ddd',
-      labelDensity: 0.15,
-      labelGridCellSize: 120,
+      // Spread labels out, less overlap
+      labelDensity: 0.08,
+      labelGridCellSize: 180,
       zIndex: true,
+      // Node border for selected
+      nodeReducer: undefined,
+      edgeReducer: undefined,
     });
-
     sigmaRef.current = renderer;
 
-    // Hover reducer: highlight neighbors
-    let currentHovered: string | null = null;
+    // ─── Unified reducer that handles hover + selection ───
+    function applyReducers() {
+      const hovered = hoveredRef.current;
+      const selected = selectedRef.current;
+      const focus = hovered || selected;
 
-    renderer.on('enterNode', ({ node }) => {
-      currentHovered = node;
-      setHoveredNode(node);
-      renderer.setSetting('nodeReducer', (n, data) => {
+      if (!focus || !graph.hasNode(focus)) {
+        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
+          const res = { ...data };
+          // Only show labels for forceLabel (important) nodes at default zoom
+          if (!graph.getNodeAttribute(node, 'forceLabel')) {
+            // Let sigma's threshold handle it
+          }
+          return res;
+        });
+        renderer.setSetting('edgeReducer', null);
+        renderer.refresh();
+        return;
+      }
+
+      const neighborSet = new Set(graph.neighbors(focus));
+      neighborSet.add(focus);
+
+      renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
         const res = { ...data };
-        if (n === currentHovered) {
+        if (node === focus) {
           res.highlighted = true;
-          res.zIndex = 2;
-        } else if (graph.hasNode(currentHovered!) && graph.areNeighbors(n, currentHovered!)) {
+          res.zIndex = 10;
+          (res as any).forceLabel = true;
+          // Make selected node bigger
+          res.size = ((data.size as number) || 8) * 1.3;
+        } else if (neighborSet.has(node)) {
           res.highlighted = true;
-          res.zIndex = 1;
+          res.zIndex = 5;
+          (res as any).forceLabel = true;
         } else {
-          res.color = `${data.color}22`;
+          // Fade out non-connected
+          const origColor = graph.getNodeAttribute(node, 'originalColor') as string;
+          res.color = hexWithAlpha(origColor, 0.08);
           res.label = '';
           res.zIndex = 0;
         }
         return res;
       });
-      renderer.setSetting('edgeReducer', (edge, data) => {
+
+      renderer.setSetting('edgeReducer', (edge: string, data: Partial<EdgeDisplayData>) => {
         const res = { ...data };
         const src = graph.source(edge);
         const tgt = graph.target(edge);
-        if (src === currentHovered || tgt === currentHovered) {
-          res.size = 3;
-          const srcColor = graph.getNodeAttribute(src === currentHovered ? src : tgt, 'color');
-          res.color = srcColor + 'AA';
+        if (neighborSet.has(src) && neighborSet.has(tgt) && (src === focus || tgt === focus)) {
+          const focusColor = graph.getNodeAttribute(focus, 'originalColor') as string;
+          res.color = hexWithAlpha(focusColor, 0.7);
+          res.size = 2.5;
+          res.zIndex = 5;
         } else {
-          res.color = '#00000008';
-          res.size = 0.5;
+          res.color = '#00000005';
+          res.size = 0.3;
+          res.zIndex = 0;
         }
         return res;
       });
+
       renderer.refresh();
+    }
+
+    // ─── Events ───
+    renderer.on('enterNode', ({ node }) => {
+      hoveredRef.current = node;
+      containerRef.current!.style.cursor = 'pointer';
+      applyReducers();
     });
 
     renderer.on('leaveNode', () => {
-      currentHovered = null;
-      setHoveredNode(null);
-      renderer.setSetting('nodeReducer', null);
-      renderer.setSetting('edgeReducer', null);
-      renderer.refresh();
+      hoveredRef.current = null;
+      containerRef.current!.style.cursor = 'grab';
+      applyReducers();
     });
 
-    // Click to select
     renderer.on('clickNode', ({ node }) => {
-      setSelectedNode(prev => prev === node ? null : node);
+      const prev = selectedRef.current;
+      const next = prev === node ? null : node;
+      setSelectedNode(next);
+      selectedRef.current = next;
+      applyReducers();
     });
 
-    // Double-click to navigate
     renderer.on('doubleClickNode', ({ node, event }) => {
       event.preventSigmaDefault();
       const slug = graph.getNodeAttribute(node, 'slug') as string;
@@ -325,10 +350,15 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       }
     });
 
-    // Click stage to deselect
     renderer.on('clickStage', () => {
       setSelectedNode(null);
+      selectedRef.current = null;
+      applyReducers();
     });
+
+    // Initial state
+    applyReducers();
+    containerRef.current!.style.cursor = 'grab';
 
     return () => {
       renderer.kill();
@@ -337,68 +367,63 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     };
   }, [topics, relations, clusterMap, navigate, onOpenDiscussion]);
 
-  // Notify parent of selection changes
+  // Sync selection changes from outside (e.g. search)
+  useEffect(() => {
+    selectedRef.current = selectedNode;
+    const renderer = sigmaRef.current;
+    if (renderer) {
+      // Re-apply reducers
+      const graph = graphRef.current;
+      if (!graph) return;
+      const focus = hoveredRef.current || selectedNode;
+      if (!focus || !graph.hasNode(focus)) {
+        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => ({ ...data }));
+        renderer.setSetting('edgeReducer', null);
+      } else {
+        const neighborSet = new Set(graph.neighbors(focus));
+        neighborSet.add(focus);
+        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
+          const res = { ...data };
+          if (node === focus) { res.highlighted = true; res.zIndex = 10; (res as any).forceLabel = true; res.size = ((data.size as number) || 8) * 1.3; }
+          else if (neighborSet.has(node)) { res.highlighted = true; res.zIndex = 5; (res as any).forceLabel = true; }
+          else { res.color = hexWithAlpha(graph.getNodeAttribute(node, 'originalColor') as string, 0.08); res.label = ''; res.zIndex = 0; }
+          return res;
+        });
+        renderer.setSetting('edgeReducer', (edge: string, data: Partial<EdgeDisplayData>) => {
+          const res = { ...data };
+          const src = graph.source(edge);
+          const tgt = graph.target(edge);
+          if (neighborSet.has(src) && neighborSet.has(tgt) && (src === focus || tgt === focus)) {
+            res.color = hexWithAlpha(graph.getNodeAttribute(focus, 'originalColor') as string, 0.7); res.size = 2.5; res.zIndex = 5;
+          } else { res.color = '#00000005'; res.size = 0.3; res.zIndex = 0; }
+          return res;
+        });
+      }
+      renderer.refresh();
+    }
+  }, [selectedNode]);
+
+  // Notify parent
   useEffect(() => {
     onSelectNode?.(selectedNode, selectedNodeData);
   }, [selectedNode, selectedNodeData, onSelectNode]);
 
-  // Apply selected-node highlighting
-  useEffect(() => {
-    const renderer = sigmaRef.current;
-    const graph = graphRef.current;
-    if (!renderer || !graph) return;
-
-    if (selectedNode && graph.hasNode(selectedNode)) {
-      renderer.setSetting('nodeReducer', (n, data) => {
-        const res = { ...data };
-        if (n === selectedNode) {
-          res.highlighted = true;
-          res.zIndex = 2;
-        } else if (graph.areNeighbors(n, selectedNode)) {
-          res.highlighted = true;
-          res.zIndex = 1;
-        } else {
-          res.color = `${data.color}33`;
-          res.label = '';
-          res.zIndex = 0;
-        }
-        return res;
-      });
-      renderer.setSetting('edgeReducer', (edge, data) => {
-        const res = { ...data };
-        const src = graph.source(edge);
-        const tgt = graph.target(edge);
-        if (src === selectedNode || tgt === selectedNode) {
-          res.size = 3;
-          res.color = graph.getNodeAttribute(selectedNode, 'color') + 'BB';
-        } else {
-          res.color = '#00000008';
-          res.size = 0.5;
-        }
-        return res;
-      });
-    } else {
-      renderer.setSetting('nodeReducer', null);
-      renderer.setSetting('edgeReducer', null);
-    }
-    renderer.refresh();
-  }, [selectedNode]);
-
-  // Camera focus on search result
+  // Camera focus
   const focusNode = useCallback((nodeId: string) => {
     const renderer = sigmaRef.current;
     const graph = graphRef.current;
     if (!renderer || !graph || !graph.hasNode(nodeId)) return;
-
     setSelectedNode(nodeId);
     setSearchOpen(false);
     setSearchQuery('');
-
-    const pos = graph.getNodeAttributes(nodeId);
-    renderer.getCamera().animate(
-      { x: pos.x as number, y: pos.y as number, ratio: 0.3 },
-      { duration: 400 },
-    );
+    const attrs = graph.getNodeAttributes(nodeId);
+    const nodePos = renderer.getNodeDisplayData(nodeId);
+    if (nodePos) {
+      renderer.getCamera().animate(
+        { x: nodePos.x, y: nodePos.y, ratio: 0.25 },
+        { duration: 400 },
+      );
+    }
   }, []);
 
   const handleOpen = useCallback((slug: string) => {
@@ -408,28 +433,37 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
 
   if (topics.length < 2) return null;
 
-  const showSidebar = !fullHeight; // In standalone mode, show built-in sidebar
-
   return (
     <div className={cn(
-      'rounded-xl overflow-hidden border border-border bg-card relative',
-      expanded && 'fixed inset-4 z-50',
-      fullHeight && 'h-full border-0 rounded-none',
+      'overflow-hidden relative',
+      !fullHeight && 'rounded-xl border border-border',
+      expanded && 'fixed inset-0 z-50 rounded-none',
+      fullHeight && 'h-full',
     )}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card z-10 relative">
-        <div className="flex items-center gap-2">
-          <Network className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold text-foreground">Discourse Network</span>
-          <span className="text-[10px] text-muted-foreground ml-1">{topics.length} topics · {relations.length} links</span>
+      {/* Minimal toolbar — floats over graph */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 py-2 pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Cluster legend — compact */}
+          <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm rounded-full px-2.5 py-1 border border-border/50">
+            {clusters.map(c => (
+              <span
+                key={c.id}
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ background: c.color }}
+                title={`${c.label} (${c.nodeCount})`}
+              />
+            ))}
+            <span className="text-[9px] text-muted-foreground ml-1">{topics.length} topics</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground mr-1 hidden sm:inline">Scroll zoom · Drag pan · Click select · Dbl-click open</span>
+
+        <div className="flex items-center gap-1 pointer-events-auto">
+          <span className="text-[9px] text-muted-foreground/60 mr-1 hidden sm:inline">scroll zoom · drag pan · click focus</span>
           {/* Search */}
           <div className="relative">
             <button
               onClick={() => setSearchOpen(o => !o)}
-              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-card/80 backdrop-blur-sm transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
@@ -441,7 +475,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
                     autoFocus
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search topics…"
+                    placeholder="Find a topic…"
                     className="flex-1 text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
                   />
                   {searchQuery && (
@@ -458,10 +492,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
                         onClick={() => focusNode(t.id)}
                         className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-accent transition-colors flex items-center gap-2"
                       >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: CLUSTER_PALETTE[(clusterMap.get(t.category) ?? 0) % CLUSTER_PALETTE.length] }}
-                        />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CLUSTER_PALETTE[(clusterMap.get(t.category) ?? 0) % CLUSTER_PALETTE.length] }} />
                         <span className="truncate">{t.title}</span>
                       </button>
                     ))}
@@ -476,7 +507,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
           {!fullHeight && (
             <button
               onClick={() => setExpanded(e => !e)}
-              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
+              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-card/80 backdrop-blur-sm transition-colors"
             >
               {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </button>
@@ -484,110 +515,85 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         </div>
       </div>
 
-      <div className="flex" style={{ height: fullHeight ? 'calc(100% - 40px)' : expanded ? 'calc(100% - 40px)' : '500px' }}>
-        {/* Sigma container */}
-        <div ref={containerRef} className="flex-1 relative bg-background" />
+      {/* Graph canvas — takes full space */}
+      <div
+        ref={containerRef}
+        className="w-full h-full bg-background"
+        style={{ minHeight: fullHeight ? undefined : expanded ? '100vh' : '560px' }}
+      />
 
-        {/* Sidebar — only in standalone mode */}
-        {showSidebar && (
-          <div className="w-60 border-l border-border overflow-y-auto bg-card flex-shrink-0 hidden md:block">
-            <div className="p-3 space-y-4">
-              {/* Clusters */}
-              <div>
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Topic Clusters</h4>
-                <div className="space-y-1.5">
-                  {clusters.map(c => (
-                    <div key={c.id} className="flex items-center gap-2 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
-                      <span className="text-foreground font-medium truncate flex-1">{c.label}</span>
-                      <span className="text-muted-foreground text-[10px]">{c.nodeCount}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Gaps */}
-              {gaps.length > 0 && (
-                <div>
-                  <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Lightbulb className="h-3 w-3" /> Gaps
-                  </h4>
-                  <div className="space-y-2">
-                    {gaps.map((gap, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-[10px]">
-                        <span className="font-medium px-1.5 py-0.5 rounded" style={{ background: gap.a.color + '22', color: gap.a.color }}>{gap.a.label}</span>
-                        <span className="text-muted-foreground">↔</span>
-                        <span className="font-medium px-1.5 py-0.5 rounded" style={{ background: gap.b.color + '22', color: gap.b.color }}>{gap.b.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">
-                    Weakly connected clusters. Bridge with new discussions.
-                  </p>
-                </div>
-              )}
-
-              {/* Selected */}
-              {selectedNodeData && (
-                <div className="border-t border-border pt-3">
-                  <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Selected</h4>
-                  <p className="text-xs text-foreground font-medium leading-snug">{selectedNodeData.title}</p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-                    <span className="px-1.5 py-0.5 rounded" style={{
-                      background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '22',
+      {/* Contextual node panel — appears on selection, overlays bottom-right */}
+      {selectedNodeData && (
+        <div className="absolute bottom-4 right-4 z-20 w-72 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-foreground leading-snug">{selectedNodeData.title}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                    style={{
+                      background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '18',
                       color: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length],
-                    }}>
-                      {selectedNodeData.category}
-                    </span>
-                    <span>{selectedNodeData.postCount} posts</span>
-                  </div>
-                  <button
-                    onClick={() => handleOpen(selectedNodeData.slug)}
-                    className="mt-2 flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
+                    }}
                   >
-                    Open discussion <ChevronRight className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
-
-              {/* Stats */}
-              <div className="border-t border-border pt-3">
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h4>
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="bg-accent rounded p-2">
-                    <div className="text-sm font-bold text-foreground">{topics.length}</div>
-                    <div className="text-[9px] text-muted-foreground">Topics</div>
-                  </div>
-                  <div className="bg-accent rounded p-2">
-                    <div className="text-sm font-bold text-foreground">{relations.length}</div>
-                    <div className="text-[9px] text-muted-foreground">Links</div>
-                  </div>
-                  <div className="bg-accent rounded p-2">
-                    <div className="text-sm font-bold text-foreground">{clusters.length}</div>
-                    <div className="text-[9px] text-muted-foreground">Clusters</div>
-                  </div>
-                  <div className="bg-accent rounded p-2">
-                    <div className="text-sm font-bold text-foreground">{gaps.length}</div>
-                    <div className="text-[9px] text-muted-foreground">Gaps</div>
-                  </div>
+                    {selectedNodeData.category}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                    <MessageSquare className="h-2.5 w-2.5" /> {selectedNodeData.postCount}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">{selectedNodeData.degree} connections</span>
                 </div>
               </div>
+              <button onClick={() => setSelectedNode(null)} className="text-muted-foreground hover:text-foreground p-0.5 shrink-0 mt-0.5">
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Bottom legend */}
-      <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 z-10">
-        {clusters.map(c => (
-          <span
-            key={c.id}
-            className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm bg-card/80 border"
-            style={{ color: c.color, borderColor: c.color + '44' }}
-          >
-            {c.label}
-          </span>
-        ))}
+            {/* Neighbors */}
+            {selectedNodeData.neighborTitles.length > 0 && (
+              <div className="mb-3">
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Connected to</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedNodeData.neighborTitles.slice(0, 5).map((title, i) => (
+                    <button
+                      key={i}
+                      onClick={() => focusNode(selectedNodeData.neighbors[i])}
+                      className="text-[10px] text-muted-foreground hover:text-foreground bg-accent/60 hover:bg-accent px-1.5 py-0.5 rounded transition-colors truncate max-w-[120px]"
+                    >
+                      {title}
+                    </button>
+                  ))}
+                  {selectedNodeData.neighborTitles.length > 5 && (
+                    <span className="text-[10px] text-muted-foreground/60 px-1 py-0.5">+{selectedNodeData.neighborTitles.length - 5} more</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => handleOpen(selectedNodeData.slug)}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Open Discussion <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom-left: expanded cluster legend on hover */}
+      <div className="absolute bottom-4 left-4 z-10">
+        <div className="group">
+          <div className="bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 px-3 py-2 space-y-1 opacity-60 hover:opacity-100 transition-opacity">
+            {clusters.map(c => (
+              <div key={c.id} className="flex items-center gap-2 text-[10px]">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
+                <span className="text-foreground/80 font-medium">{c.label}</span>
+                <span className="text-muted-foreground ml-auto">{c.nodeCount}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
