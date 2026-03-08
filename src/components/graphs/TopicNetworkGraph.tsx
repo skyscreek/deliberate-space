@@ -87,11 +87,14 @@ interface Props {
   topics: TopicRow[];
   relations: TopicRelation[];
   fullHeight?: boolean;
+  height?: string;
+  mode?: 'global' | 'local';
+  currentTopicId?: string;
   onSelectNode?: (nodeId: string | null, nodeData: NodeData | null) => void;
   onOpenDiscussion?: (slug: string) => void;
 }
 
-export default function TopicNetworkGraph({ topics, relations, fullHeight, onSelectNode, onOpenDiscussion }: Props) {
+export default function TopicNetworkGraph({ topics, relations, fullHeight, height, mode = 'global', currentTopicId, onSelectNode, onOpenDiscussion }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const graphRef = useRef<Graph | null>(null);

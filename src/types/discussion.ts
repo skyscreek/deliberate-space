@@ -127,7 +127,7 @@ export interface Topic extends TopicMeta {
 }
 
 export interface ActiveFilter {
-  type: 'tension' | 'cluster' | 'question';
+  type: 'tension' | 'cluster' | 'question' | 'proposal';
   id: string;
   relatedPostIds: string[];
 }
