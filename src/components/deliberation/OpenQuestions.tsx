@@ -30,11 +30,11 @@ export default function OpenQuestions({ questions }: { questions: OpenQuestion[]
                 }
               }}
               className={cn(
-                'w-full text-left flex items-start gap-2 rounded-md border p-2.5 text-xs transition-all duration-200 hover:border-primary/40',
-                isActive && 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20 ring-1 ring-amber-400',
+                'w-full text-left flex items-start gap-2 glass-subtle rounded-lg p-2.5 text-xs transition-all duration-200 hover:ring-1 hover:ring-primary/30',
+                isActive && 'ring-2 ring-highlight bg-highlight-bg',
               )}
             >
-              <HelpCircle className="h-3.5 w-3.5 mt-0.5 text-amber-500 shrink-0" />
+              <HelpCircle className="h-3.5 w-3.5 mt-0.5 text-argdown-question shrink-0" />
               <span className="text-foreground/80">{q.question}</span>
             </button>
           );

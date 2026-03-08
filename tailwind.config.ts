@@ -57,14 +57,19 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        vote: {
-          up: "hsl(var(--vote-up))",
-          down: "hsl(var(--vote-down))",
-        },
+        "vote-up": "hsl(var(--vote-up))",
+        "vote-down": "hsl(var(--vote-down))",
         "thread-line": "hsl(var(--thread-line))",
-        highlight: {
-          DEFAULT: "hsl(var(--highlight))",
-          bg: "hsl(var(--highlight-bg))",
+        highlight: "hsl(var(--highlight))",
+        "highlight-bg": "hsl(var(--highlight-bg))",
+        argdown: {
+          claim: "hsl(var(--argdown-claim))",
+          support: "hsl(var(--argdown-support))",
+          objection: "hsl(var(--argdown-objection))",
+          concern: "hsl(var(--argdown-concern))",
+          alternative: "hsl(var(--argdown-alternative))",
+          question: "hsl(var(--argdown-question))",
+          proposal: "hsl(var(--argdown-proposal))",
         },
       },
       borderRadius: {

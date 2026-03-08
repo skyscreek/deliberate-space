@@ -24,8 +24,8 @@ export default function ClusterList({ clusters }: { clusters: ArgumentCluster[] 
               key={c.id}
               onClick={() => isActive ? setFilter(null) : setFilter({ type: 'cluster', id: c.id, relatedPostIds: c.relatedPostIds })}
               className={cn(
-                'w-full text-left rounded-md border p-3 transition-all duration-200 hover:border-primary/40',
-                isActive && 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20 ring-1 ring-amber-400',
+                'w-full text-left glass-subtle rounded-lg p-3 transition-all duration-200 hover:ring-1 hover:ring-primary/30',
+                isActive && 'ring-2 ring-highlight bg-highlight-bg',
               )}
             >
               <div className="flex items-center gap-2 mb-1">

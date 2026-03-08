@@ -5,7 +5,7 @@ import { MessageSquare, Users, Swords, HelpCircle, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const statusColors: Record<string, string> = {
-  active: 'bg-vote-up/15 text-vote-up border-vote-up/30',
+  active: 'bg-argdown-support/15 text-argdown-support border-argdown-support/30',
   'seeking-consensus': 'bg-highlight-bg text-highlight border-highlight/30',
   resolved: 'bg-primary/10 text-primary border-primary/30',
 };
@@ -25,8 +25,7 @@ export default function TopicCard({ topic, preview }: TopicCardProps) {
   const href = topic.id === 'topic-1' ? '/discussion/topic-1' : '#';
 
   return (
-    <Link to={href} className="flex gap-4 px-4 py-3.5 hover:bg-secondary/40 transition-colors group">
-      {/* Vote score placeholder */}
+    <Link to={href} className="flex gap-4 px-4 py-3.5 hover:bg-accent/30 transition-colors group">
       <div className="flex flex-col items-center justify-start pt-0.5 min-w-[2.5rem]">
         <span className="text-sm font-bold text-foreground">{topic.postCount}</span>
         <span className="text-[10px] text-muted-foreground">posts</span>
@@ -64,8 +63,8 @@ export default function TopicCard({ topic, preview }: TopicCardProps) {
 
         {preview && (
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground pt-0.5">
-            <span className="flex items-center gap-1"><Swords className="h-3 w-3 text-destructive/60" />{preview.tensions} tensions</span>
-            <span className="flex items-center gap-1"><HelpCircle className="h-3 w-3 text-highlight" />{preview.openQuestions} open</span>
+            <span className="flex items-center gap-1"><Swords className="h-3 w-3 text-argdown-objection/60" />{preview.tensions} tensions</span>
+            <span className="flex items-center gap-1"><HelpCircle className="h-3 w-3 text-argdown-question" />{preview.openQuestions} open</span>
             <span className="text-muted-foreground/60">·</span>
             <span className="truncate italic text-muted-foreground/70">{preview.summary}</span>
           </div>

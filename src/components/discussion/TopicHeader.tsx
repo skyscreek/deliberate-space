@@ -4,7 +4,7 @@ import { Users, MessageSquare, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const statusColors: Record<string, string> = {
-  active: 'bg-vote-up/15 text-vote-up border-vote-up/30',
+  active: 'bg-argdown-support/15 text-argdown-support border-argdown-support/30',
   'seeking-consensus': 'bg-highlight-bg text-highlight border-highlight/30',
   resolved: 'bg-primary/10 text-primary border-primary/30',
 };

@@ -1,6 +1,7 @@
 import { GuidanceItem } from '@/types/discussion';
+import { useDiscussion } from '@/context/DiscussionContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, AlertTriangle, Search, Eye, Lightbulb, MessageSquare, ArrowRightLeft, HelpCircle } from 'lucide-react';
+import { ChevronDown, AlertTriangle, Search, Eye, Lightbulb, MessageSquare, ArrowRightLeft, HelpCircle, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 
 const icons: Record<string, typeof AlertTriangle> = {
@@ -14,17 +15,28 @@ const icons: Record<string, typeof AlertTriangle> = {
 };
 
 const colors: Record<string, string> = {
-  overrepresented: 'text-amber-500',
-  'evidence-needed': 'text-blue-500',
-  'missing-perspective': 'text-purple-500',
-  gap: 'text-emerald-500',
-  'missing-counterargument': 'text-destructive',
-  'missing-alternative': 'text-violet-500',
-  'unresolved-question': 'text-amber-500',
+  overrepresented: 'text-argdown-concern',
+  'evidence-needed': 'text-argdown-proposal',
+  'missing-perspective': 'text-argdown-alternative',
+  gap: 'text-argdown-support',
+  'missing-counterargument': 'text-argdown-objection',
+  'missing-alternative': 'text-argdown-alternative',
+  'unresolved-question': 'text-argdown-question',
 };
 
 export default function ContributionGuidance({ items }: { items: GuidanceItem[] }) {
   const [open, setOpen] = useState(true);
+  const { startAssistedComment } = useDiscussion();
+
+  const handleClick = (item: GuidanceItem) => {
+    startAssistedComment({
+      guidanceId: item.id,
+      targetPostId: item.targetPostId,
+      label: item.label,
+      description: item.description,
+      suggestedArgdownType: item.suggestedArgdownType,
+    });
+  };
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -36,13 +48,18 @@ export default function ContributionGuidance({ items }: { items: GuidanceItem[] 
         {items.map((item) => {
           const Icon = icons[item.type];
           return (
-            <div key={item.id} className="flex items-start gap-2 rounded-md border p-2.5">
+            <button
+              key={item.id}
+              onClick={() => handleClick(item)}
+              className="group w-full text-left flex items-start gap-2 glass-subtle rounded-lg p-2.5 transition-all hover:ring-1 hover:ring-primary/30"
+            >
               <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${colors[item.type]}`} />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground">{item.label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
               </div>
-            </div>
+              <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+            </button>
           );
         })}
       </CollapsibleContent>

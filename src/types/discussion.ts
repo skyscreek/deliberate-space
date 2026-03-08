@@ -1,8 +1,10 @@
+export type ArgdownType = 'claim' | 'support' | 'objection' | 'concern' | 'alternative' | 'question' | 'proposal' | 'evidence' | 'rebuttal';
+
 export interface Author {
   id: string;
   name: string;
-  avatar: string; // initials like "MC", "JO"
-  color: string;  // hsl bg color for avatar circle
+  avatar: string;
+  color: string;
   role?: string;
 }
 
@@ -19,7 +21,8 @@ export interface Reply {
   createdAt: string;
   score: number;
   reactions: Reaction[];
-  replies?: Reply[]; // nested replies
+  replies?: Reply[];
+  argdownType?: ArgdownType;
 }
 
 export interface Post {
@@ -30,6 +33,7 @@ export interface Post {
   score: number;
   reactions: Reaction[];
   replies: Reply[];
+  argdownType?: ArgdownType;
 }
 
 export interface Tension {
@@ -61,6 +65,8 @@ export interface GuidanceItem {
   type: 'overrepresented' | 'evidence-needed' | 'missing-perspective' | 'gap' | 'missing-counterargument' | 'missing-alternative' | 'unresolved-question';
   label: string;
   description: string;
+  targetPostId?: string;
+  suggestedArgdownType?: ArgdownType;
 }
 
 export interface TopicMeta {
@@ -122,4 +128,12 @@ export interface ActiveFilter {
   type: 'tension' | 'cluster' | 'question';
   id: string;
   relatedPostIds: string[];
+}
+
+export interface AssistedComment {
+  guidanceId: string;
+  targetPostId?: string;
+  label: string;
+  description: string;
+  suggestedArgdownType?: ArgdownType;
 }
