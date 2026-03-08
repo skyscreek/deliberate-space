@@ -10,8 +10,8 @@ export default function ThreadView({ posts }: { posts: Post[] }) {
   return (
     <div className="space-y-3">
       {activeFilter && (
-        <div className="flex items-center gap-2 surface-card px-3 py-2 text-sm ring-1 ring-highlight/40 bg-highlight-bg">
-          <span className="text-foreground">
+        <div className="flex items-center gap-2 surface-card-elevated px-4 py-2.5 text-sm ring-2 ring-highlight/50 bg-highlight-bg">
+          <span className="text-foreground font-medium">
             Showing posts related to: <strong>{activeFilter.type}</strong> — {activeFilter.relatedPostIds.length} posts
           </span>
           <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => setFilter(null)}>

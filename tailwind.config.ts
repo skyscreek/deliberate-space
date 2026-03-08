@@ -62,6 +62,11 @@ export default {
         "thread-line": "hsl(var(--thread-line))",
         highlight: "hsl(var(--highlight))",
         "highlight-bg": "hsl(var(--highlight-bg))",
+        insights: {
+          bg: "hsl(var(--insights-bg))",
+          border: "hsl(var(--insights-border))",
+          header: "hsl(var(--insights-header))",
+        },
         argdown: {
           claim: "hsl(var(--argdown-claim))",
           support: "hsl(var(--argdown-support))",
