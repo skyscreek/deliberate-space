@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Discussion from "./pages/Discussion";
 import Category from "./pages/Category";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/discussion/:id" element={<Discussion />} />
             <Route path="/category/:slug" element={<Category />} />
             <Route path="*" element={<NotFound />} />

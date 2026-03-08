@@ -101,6 +101,13 @@ export default function Auth() {
             <Button type="submit" className="w-full" disabled={submitting}>
               {submitting ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
             </Button>
+            {mode === 'signin' && (
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
+            )}
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
