@@ -3,19 +3,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Lightbulb, X, Compass } from 'lucide-react';
 import { useDiscussion } from '@/context/DiscussionContext';
-import { cn } from '@/lib/utils';
 import { useEffect, useRef } from 'react';
 
 const argdownLabels: Record<string, string> = {
-  evidence: '📊 Evidence',
-  support: '✅ Supporting Argument',
-  objection: '❌ Objection',
-  alternative: '🔄 Alternative',
-  concern: '⚠️ Concern',
-  rebuttal: '↩️ Rebuttal',
-  question: '❓ Question',
-  claim: '💬 Claim',
-  proposal: '💡 Proposal',
+  evidence: '📊 Evidence', support: '✅ Support', objection: '❌ Objection',
+  alternative: '🔄 Alternative', concern: '⚠️ Concern', rebuttal: '↩️ Rebuttal',
+  question: '❓ Question', claim: '💬 Claim', proposal: '💡 Proposal',
 };
 
 export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) {
@@ -30,9 +23,9 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
   }, [assistedComment]);
 
   return (
-    <div id="composer-box" className="glass rounded-lg p-4 space-y-3">
+    <div id="composer-box" className="surface-card p-4 space-y-3">
       {assistedComment ? (
-        <div className="glass-subtle rounded-lg px-4 py-3 space-y-2">
+        <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
               <Compass className="h-4 w-4 text-primary shrink-0" />
@@ -70,14 +63,14 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
           ? `Write your ${assistedComment.suggestedArgdownType || 'contribution'} here…`
           : 'Share your perspective, evidence, or questions…'
         }
-        className="min-h-[100px] resize-y bg-accent/20 border-border/50"
+        className="min-h-[100px] resize-y bg-accent/30 border-border/50 focus:border-primary/40"
       />
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
           <Lightbulb className="h-3 w-3" />
-          Your post will be automatically classified (claim, objection, evidence…)
+          Your post will be automatically classified
         </p>
-        <Button size="sm">Post contribution</Button>
+        <Button size="sm">Post</Button>
       </div>
     </div>
   );

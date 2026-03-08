@@ -3,14 +3,14 @@ import { useDiscussion } from '@/context/DiscussionContext';
 import { cn } from '@/lib/utils';
 import { Shield, ThumbsUp, AlertTriangle, HelpCircle, Lightbulb, ArrowRightLeft, Target } from 'lucide-react';
 
-const nodeConfig: Record<ArgumentNode['type'], { icon: typeof Shield; label: string; color: string; bg: string }> = {
-  claim:       { icon: Target,          label: 'Claim',       color: 'text-argdown-claim',       bg: 'bg-argdown-claim/8 border-l-argdown-claim' },
-  support:     { icon: ThumbsUp,        label: 'Support',     color: 'text-argdown-support',     bg: 'bg-argdown-support/8 border-l-argdown-support' },
-  objection:   { icon: Shield,          label: 'Objection',   color: 'text-argdown-objection',   bg: 'bg-argdown-objection/8 border-l-argdown-objection' },
-  concern:     { icon: AlertTriangle,   label: 'Concern',     color: 'text-argdown-concern',     bg: 'bg-argdown-concern/8 border-l-argdown-concern' },
-  alternative: { icon: ArrowRightLeft,  label: 'Alternative', color: 'text-argdown-alternative', bg: 'bg-argdown-alternative/8 border-l-argdown-alternative' },
-  question:    { icon: HelpCircle,      label: 'Open Question', color: 'text-argdown-question', bg: 'bg-argdown-question/8 border-l-argdown-question' },
-  proposal:    { icon: Lightbulb,       label: 'Proposal',    color: 'text-argdown-proposal',    bg: 'bg-argdown-proposal/8 border-l-argdown-proposal' },
+const nodeConfig: Record<ArgumentNode['type'], { icon: typeof Shield; label: string; color: string; border: string }> = {
+  claim:       { icon: Target,          label: 'Claim',       color: 'text-argdown-claim',       border: 'border-l-argdown-claim' },
+  support:     { icon: ThumbsUp,        label: 'Support',     color: 'text-argdown-support',     border: 'border-l-argdown-support' },
+  objection:   { icon: Shield,          label: 'Objection',   color: 'text-argdown-objection',   border: 'border-l-argdown-objection' },
+  concern:     { icon: AlertTriangle,   label: 'Concern',     color: 'text-argdown-concern',     border: 'border-l-argdown-concern' },
+  alternative: { icon: ArrowRightLeft,  label: 'Alternative', color: 'text-argdown-alternative', border: 'border-l-argdown-alternative' },
+  question:    { icon: HelpCircle,      label: 'Question',    color: 'text-argdown-question',    border: 'border-l-argdown-question' },
+  proposal:    { icon: Lightbulb,       label: 'Proposal',    color: 'text-argdown-proposal',    border: 'border-l-argdown-proposal' },
 };
 
 function ArgumentNodeCard({ node, depth = 0 }: { node: ArgumentNode; depth?: number }) {
@@ -19,11 +19,8 @@ function ArgumentNodeCard({ node, depth = 0 }: { node: ArgumentNode; depth?: num
   const Icon = config.icon;
 
   return (
-    <div className={cn('space-y-2', depth > 0 && 'ml-4 sm:ml-6')}>
-      <div className={cn(
-        'glass-subtle rounded-lg border-l-[3px] px-3 py-2.5 transition-colors',
-        config.bg,
-      )}>
+    <div className={cn('space-y-2', depth > 0 && 'ml-5')}>
+      <div className={cn('surface-card border-l-[3px] px-3 py-2.5', config.border)}>
         <div className="flex items-start gap-2">
           <Icon className={cn('h-3.5 w-3.5 mt-0.5 shrink-0', config.color)} />
           <div className="flex-1 min-w-0">
@@ -62,17 +59,11 @@ function ArgumentNodeCard({ node, depth = 0 }: { node: ArgumentNode; depth?: num
 export default function ArgumentMapView({ nodes }: { nodes: ArgumentNode[] }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 px-1">
-        <p className="text-xs text-muted-foreground">
-          Structured Argdown view of claims, evidence, objections, and proposals extracted from the discussion.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-3 px-1">
+      <div className="flex flex-wrap gap-3 px-1 text-[10px] text-muted-foreground">
         {Object.entries(nodeConfig).map(([type, config]) => {
           const Icon = config.icon;
           return (
-            <div key={type} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <div key={type} className="flex items-center gap-1">
               <Icon className={cn('h-3 w-3', config.color)} />
               <span>{config.label}</span>
             </div>

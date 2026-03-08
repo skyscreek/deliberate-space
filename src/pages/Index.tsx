@@ -1,27 +1,39 @@
-import { stubTopics } from '@/data/mockData';
-import { topicDeliberationPreviews } from '@/data/mockData';
+import { stubTopics, topicDeliberationPreviews } from '@/data/mockData';
 import TopicCard from '@/components/TopicCard';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, TrendingUp } from 'lucide-react';
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <header className="glass-strong border-b">
-        <div className="mx-auto max-w-3xl px-4 py-5">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-bold text-foreground tracking-tight">Delibera</h1>
+      {/* Header */}
+      <header className="glass-strong sticky top-0 z-30 border-b">
+        <div className="mx-auto max-w-3xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h1 className="text-base font-bold text-foreground tracking-tight">Delibera</h1>
+            </div>
+            <span className="text-xs text-muted-foreground">Structured community discussion</span>
           </div>
-          <p className="mt-1.5 text-sm text-muted-foreground">Structured deliberation on complex public topics.</p>
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="glass rounded-lg overflow-hidden">
-          <div className="border-b border-border/50 bg-accent/30 px-4 py-2.5">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Discussions</h2>
-          </div>
-          <div className="divide-y divide-border/50">
+      <main className="mx-auto max-w-3xl px-4 py-5 space-y-4">
+        {/* Active stats bar */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
+          <span className="flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+            <span className="font-medium text-foreground">{stubTopics.length} active discussions</span>
+          </span>
+          <span>·</span>
+          <span>{stubTopics.reduce((s, t) => s + t.participantCount, 0)} participants</span>
+          <span>·</span>
+          <span>{stubTopics.reduce((s, t) => s + t.postCount, 0)} contributions</span>
+        </div>
+
+        {/* Discussion feed */}
+        <div className="surface-card overflow-hidden">
+          <div className="divide-y divide-border/60">
             {stubTopics.map((topic) => (
               <TopicCard key={topic.id} topic={topic} preview={topicDeliberationPreviews[topic.id]} />
             ))}
