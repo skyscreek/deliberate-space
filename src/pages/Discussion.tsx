@@ -20,6 +20,7 @@ import { useAnalysis, AIAnalysis } from '@/hooks/useAnalysis';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import OverviewView from '@/components/discussion/OverviewView';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
+import ArgumentGraph from '@/components/graphs/ArgumentGraph';
 import { Topic, ArgumentNode, Tension, ArgumentCluster, OpenQuestion, GuidanceItem, DiscussionSummaryData, EmergingProposal } from '@/types/discussion';
 
 const argdownColors: Partial<Record<string, string>> = {
@@ -632,11 +633,22 @@ function DiscussionContent() {
               </p>
             </div>
           ) : (
-            <ArgumentMapView
-              nodes={topicForViews.argumentMap}
-              onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
-              initialFilter={argMapFilter}
-            />
+            <div className="space-y-4">
+              {/* Interactive graph visualization */}
+              <ArgumentGraph
+                nodes={topicForViews.argumentMap}
+                onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+              />
+              {/* Tree view below */}
+              <div className="border-t border-border/40 pt-4">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Tree View</h3>
+                <ArgumentMapView
+                  nodes={topicForViews.argumentMap}
+                  onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+                  initialFilter={argMapFilter}
+                />
+              </div>
+            </div>
           )}
         </TabsContent>
       </Tabs>

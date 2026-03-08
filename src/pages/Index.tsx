@@ -1,4 +1,5 @@
 import { useTopics, TopicRow } from '@/hooks/useTopics';
+import { useTopicRelations } from '@/hooks/useTopicRelations';
 import { useCreateTopic } from '@/hooks/useCreateTopic';
 import { useAuth } from '@/context/AuthContext';
 import UserMenu from '@/components/UserMenu';
@@ -15,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import TopicNetworkGraph from '@/components/graphs/TopicNetworkGraph';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   active: { label: 'Active', className: 'bg-vote-up/10 text-vote-up border-vote-up/20' },
@@ -136,6 +138,7 @@ function CreateTopicDialog() {
 
 const Index = () => {
   const { data: topics, isLoading, error } = useTopics();
+  const { data: relations } = useTopicRelations();
 
   const totalPosts = topics?.reduce((s, t) => s + (t.post_count || 0), 0) ?? 0;
   const totalParticipants = topics?.reduce((s, t) => s + (t.participant_count || 0), 0) ?? 0;
@@ -185,6 +188,11 @@ const Index = () => {
           <div className="surface-card-elevated p-8 text-center space-y-2">
             <p className="text-sm text-muted-foreground">No discussions yet. Be the first to start one!</p>
           </div>
+        )}
+
+        {/* Topic network graph */}
+        {topics && topics.length >= 2 && (
+          <TopicNetworkGraph topics={topics} relations={relations ?? []} />
         )}
 
         <div className="space-y-3">
