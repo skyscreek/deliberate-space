@@ -8,6 +8,7 @@ export interface TopicRow {
   category: string;
   status: string;
   proposal: string | null;
+  slug: string;
   author_id: string;
   created_at: string;
   updated_at: string;
@@ -74,11 +75,11 @@ export function useTopics() {
   });
 }
 
-async function fetchTopic(id: string): Promise<TopicRow> {
+async function fetchTopicBySlug(slug: string): Promise<TopicRow> {
   const { data, error } = await supabase
     .from('topics')
     .select('*')
-    .eq('id', id)
+    .eq('slug', slug)
     .single();
 
   if (error) throw error;
@@ -91,14 +92,15 @@ async function fetchTopic(id: string): Promise<TopicRow> {
 
   return {
     ...data,
+    slug: data.slug ?? '',
     author_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
   };
 }
 
-export function useTopic(id: string | undefined) {
+export function useTopic(slug: string | undefined) {
   return useQuery({
-    queryKey: ['topic', id],
-    queryFn: () => fetchTopic(id!),
-    enabled: !!id,
+    queryKey: ['topic', slug],
+    queryFn: () => fetchTopicBySlug(slug!),
+    enabled: !!slug,
   });
 }

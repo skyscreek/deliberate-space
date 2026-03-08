@@ -138,7 +138,7 @@ function ActivitySection({ topics, posts }: { topics: any[] | undefined; posts: 
             {topics.map(t => {
               const status = statusConfig[t.status] || statusConfig.active;
               return (
-                <Link key={t.id} to={`/discussion/${t.id}`} className="block">
+                <Link key={t.id} to={`/d/${t.slug}`} className="block">
                   <div className="surface-card-elevated p-4 hover:border-primary/30 transition-all">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate">{t.title}</h4>
@@ -164,7 +164,7 @@ function ActivitySection({ topics, posts }: { topics: any[] | undefined; posts: 
           <h3 className="text-sm font-semibold text-foreground px-1">Recent contributions</h3>
           <div className="space-y-2">
             {posts.map(p => (
-              <Link key={p.id} to={`/discussion/${p.topic_id}`} className="block">
+              <Link key={p.id} to={`/d/${(p as any).topics?.slug || p.topic_id}`} className="block">
                 <div className="surface-card-elevated p-4 hover:border-primary/30 transition-all">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
                     <span className="text-primary font-medium truncate">

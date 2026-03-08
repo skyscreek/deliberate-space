@@ -34,7 +34,7 @@ export function useProfileTopics(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('topics')
-        .select('id, title, category, status, created_at')
+        .select('id, title, category, status, created_at, slug')
         .eq('author_id', userId!)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -50,7 +50,7 @@ export function useProfilePosts(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('posts')
-        .select('id, content, created_at, score, argdown_type, topic_id, topics(title)')
+        .select('id, content, created_at, score, argdown_type, topic_id, topics(title, slug)')
         .eq('author_id', userId!)
         .order('created_at', { ascending: false })
         .limit(20);
