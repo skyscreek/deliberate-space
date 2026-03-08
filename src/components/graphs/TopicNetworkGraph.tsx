@@ -424,11 +424,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     onOpenDiscussion ? onOpenDiscussion(slug) : navigate(`/d/${slug}`);
   }, [navigate, onOpenDiscussion]);
 
-  if (topics.length < 2) return null;
-
   // ── Broker nodes (connect multiple clusters) ──
   const brokerCount = useMemo(() => {
-    if (!graphRef.current) return 0;
+    if (!graphRef.current || topics.length < 2) return 0;
     let count = 0;
     for (const t of topics) {
       const g = graphRef.current;
@@ -438,7 +436,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       if (cats.size > 1) count++;
     }
     return count;
-  }, [topics, selectedNode]); // re-eval on selection change to have graph ready
+  }, [topics, selectedNode]);
+
+  if (topics.length < 2) return null;
 
   return (
     <div className={cn(
