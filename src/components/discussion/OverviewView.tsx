@@ -29,6 +29,7 @@ function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: 
 interface Props {
   topic: Topic;
   onSwitchToThread?: (postId: string) => void;
+  onSwitchToArgType?: (type: string) => void;
 }
 
 /* Visual cluster bubble */
@@ -97,7 +98,7 @@ function StatItem({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-export default function OverviewView({ topic, onSwitchToThread }: Props) {
+export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgType }: Props) {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
   const [highlightedType, setHighlightedType] = useState<string | null>(null);
 
@@ -157,7 +158,10 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
                     )}
                     style={{ width: `${(count / total) * 100}%` }}
                     title={`${type}: ${count}`}
-                    onClick={() => setHighlightedType(highlightedType === type ? null : type)}
+                    onClick={() => {
+                      setHighlightedType(highlightedType === type ? null : type);
+                      if (highlightedType !== type) onSwitchToArgType?.(type);
+                    }}
                   />
                 ))}
               </div>
@@ -165,7 +169,10 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
                 {Object.entries(argCounts).map(([type, count]) => (
                   <button
                     key={type}
-                    onClick={() => setHighlightedType(highlightedType === type ? null : type)}
+                    onClick={() => {
+                      setHighlightedType(highlightedType === type ? null : type);
+                      if (highlightedType !== type) onSwitchToArgType?.(type);
+                    }}
                     style={{ width: `${(count / total) * 100}%` }}
                     className={cn(
                       'flex items-center justify-center gap-1 text-[10px] capitalize transition-all duration-150 truncate',
