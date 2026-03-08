@@ -15,21 +15,21 @@ const authors = {
 
 const argumentMap: ArgumentNode[] = [
   {
-    id: 'am-1', type: 'claim',
+    id: 'am-1', type: 'claim', status: 'contested', strength: 0.6,
     text: 'Congestion pricing will reduce downtown traffic by 15–25% and improve air quality',
     author: 'Maria Chen', relatedPostIds: ['p1'],
     children: [
       {
-        id: 'am-1-1', type: 'support',
+        id: 'am-1-1', type: 'support', status: 'contested', strength: 0.7,
         text: 'Evidence from London, Stockholm, and Singapore confirms significant traffic reduction',
         author: 'Maria Chen', relatedPostIds: ['p1'],
         children: [
-          { id: 'am-1-1-1', type: 'concern', text: 'Stockholm had much better transit infrastructure before pricing — our city doesn\'t', author: 'Sarah Johansson', relatedPostIds: ['p1'], children: [] },
+          { id: 'am-1-1-1', type: 'concern', status: 'unresolved', text: 'Stockholm had much better transit infrastructure before pricing — our city doesn\'t', author: 'Sarah Johansson', relatedPostIds: ['p1'], children: [] },
         ],
       },
-      { id: 'am-1-2', type: 'support', text: 'Pediatric asthma rates downtown are 40% above city average — health costs of inaction are real', author: 'Linda Vasquez', relatedPostIds: ['p3'], children: [] },
+      { id: 'am-1-2', type: 'support', status: 'unresolved', strength: 0.5, text: 'Pediatric asthma rates downtown are 40% above city average — health costs of inaction are real', author: 'Linda Vasquez', relatedPostIds: ['p3'], children: [] },
       {
-        id: 'am-1-3', type: 'objection',
+        id: 'am-1-3', type: 'objection', status: 'contested', strength: 0.8,
         text: 'The $9 fee is effectively a tax on people who have no transit alternative',
         author: 'James Okafor', relatedPostIds: ['p2'],
         children: [
@@ -38,41 +38,41 @@ const argumentMap: ArgumentNode[] = [
         ],
       },
       {
-        id: 'am-1-4', type: 'objection',
+        id: 'am-1-4', type: 'objection', status: 'unresolved', strength: 0.5,
         text: 'Small businesses will suffer from higher delivery costs and reduced foot traffic',
         author: 'Tom Brennan', relatedPostIds: ['p4'],
         children: [
-          { id: 'am-1-4-1', type: 'question', text: 'Has anyone modeled the economic impact on local businesses?', author: 'Tom Brennan', relatedPostIds: ['p4'], children: [] },
+          { id: 'am-1-4-1', type: 'question', status: 'unresolved', text: 'Has anyone modeled the economic impact on local businesses?', author: 'Tom Brennan', relatedPostIds: ['p4'], children: [] },
         ],
       },
     ],
   },
   {
-    id: 'am-2', type: 'proposal',
+    id: 'am-2', type: 'proposal', status: 'emerging', strength: 0.7,
     text: 'Phased approach: start at $4–5, invest in transit for 2 years, then raise to $9',
     author: 'Sarah Johansson', relatedPostIds: ['p10'],
     children: [
       { id: 'am-2-1', type: 'support', text: 'Addresses the "no alternative" problem while still making progress', author: 'Sarah Johansson', relatedPostIds: ['p10'], children: [] },
-      { id: 'am-2-2', type: 'concern', text: 'Lower initial fee may not generate enough revenue for meaningful transit improvements', relatedPostIds: [], children: [] },
+      { id: 'am-2-2', type: 'concern', status: 'unresolved', text: 'Lower initial fee may not generate enough revenue for meaningful transit improvements', relatedPostIds: [], children: [] },
     ],
   },
   {
-    id: 'am-3', type: 'claim',
+    id: 'am-3', type: 'claim', status: 'emerging', strength: 0.8,
     text: 'Exemptions and equity measures are essential for the policy to be fair',
     relatedPostIds: ['p5', 'p9'],
     children: [
       { id: 'am-3-1', type: 'support', text: 'Disabled residents depend on door-to-door car transport — full exemptions needed', author: 'Aisha Patel', relatedPostIds: ['p5'], children: [] },
       { id: 'am-3-2', type: 'support', text: 'Delivery drivers will absorb costs — commercial exemptions or reduced rates needed', author: 'Mike DeLuca', relatedPostIds: ['p8'], children: [] },
-      { id: 'am-3-3', type: 'concern', text: '200% poverty line threshold creates a cliff effect that hurts the working poor', author: 'Aisha Patel', relatedPostIds: ['p9'], children: [] },
-      { id: 'am-3-4', type: 'question', text: 'How will revenue allocation be enforced and made accountable?', author: 'Chen Wei', relatedPostIds: ['p6'], children: [] },
+      { id: 'am-3-3', type: 'concern', status: 'unresolved', text: '200% poverty line threshold creates a cliff effect that hurts the working poor', author: 'Aisha Patel', relatedPostIds: ['p9'], children: [] },
+      { id: 'am-3-4', type: 'question', status: 'unresolved', text: 'How will revenue allocation be enforced and made accountable?', author: 'Chen Wei', relatedPostIds: ['p6'], children: [] },
     ],
   },
   {
-    id: 'am-4', type: 'alternative',
+    id: 'am-4', type: 'alternative', status: 'unresolved', strength: 0.2,
     text: 'Consider parking reform, employer levies, or other mechanisms instead',
     relatedPostIds: [],
     children: [
-      { id: 'am-4-1', type: 'question', text: 'Could the same goals be achieved without congestion pricing?', relatedPostIds: [], children: [] },
+      { id: 'am-4-1', type: 'question', status: 'unresolved', text: 'Could the same goals be achieved without congestion pricing?', relatedPostIds: [], children: [] },
     ],
   },
 ];

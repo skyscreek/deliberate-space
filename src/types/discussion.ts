@@ -111,6 +111,8 @@ export interface ArgumentNode {
   author?: string;
   relatedPostIds: string[];
   children: ArgumentNode[];
+  status?: 'resolved' | 'contested' | 'unresolved' | 'emerging';
+  strength?: number;
 }
 
 export interface Topic extends TopicMeta {

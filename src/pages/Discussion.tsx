@@ -8,15 +8,16 @@ import DiscussionOverview from '@/components/discussion/DiscussionOverview';
 import ThreadView from '@/components/discussion/ThreadView';
 import ComposerBox from '@/components/discussion/ComposerBox';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
+import OverviewView from '@/components/discussion/OverviewView';
 import DeliberationSidebar from '@/components/deliberation/DeliberationSidebar';
-import { ArrowLeft, PanelRightOpen, X, MessageSquare, GitBranch, Sparkles } from 'lucide-react';
+import { ArrowLeft, PanelRightOpen, X, MessageSquare, GitBranch, BarChart3, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
-type ViewTab = 'thread' | 'argument-map';
+type ViewTab = 'thread' | 'overview' | 'argument-map';
 
 export default function Discussion() {
   const { id } = useParams();
@@ -25,8 +26,18 @@ export default function Discussion() {
 
   const tabs: { id: ViewTab; label: string; icon: typeof MessageSquare }[] = [
     { id: 'thread', label: 'Discussion', icon: MessageSquare },
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'argument-map', label: 'Argument Map', icon: GitBranch },
   ];
+
+  const handleSwitchToThread = (postId: string) => {
+    setActiveTab('thread');
+    // Small delay to let the thread render before scrolling
+    setTimeout(() => {
+      const el = document.getElementById(`post-${postId}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
 
   return (
     <DiscussionProvider>
@@ -75,13 +86,15 @@ export default function Discussion() {
               {/* 2. Proposal / discussion prompt */}
               <ProposalPrompt text={topic.proposal} />
 
-              {/* 3. Discussion insights (above thread) */}
-              <DiscussionOverview
-                summary={topic.summary}
-                tensions={topic.tensions}
-                openQuestions={topic.openQuestions}
-                guidance={topic.guidance}
-              />
+              {/* 3. Discussion insights — only on thread tab */}
+              {activeTab === 'thread' && (
+                <DiscussionOverview
+                  summary={topic.summary}
+                  tensions={topic.tensions}
+                  openQuestions={topic.openQuestions}
+                  guidance={topic.guidance}
+                />
+              )}
 
               {/* View tabs */}
               <div className="flex items-center gap-1 border-b border-border">
@@ -105,15 +118,18 @@ export default function Discussion() {
                 })}
               </div>
 
-              {/* 4. Main thread / argument map */}
+              {/* 4. Main content by tab */}
               {activeTab === 'thread' && (
                 <>
                   <ThreadView posts={topic.posts} />
                   <ComposerBox guidance={topic.guidance} />
                 </>
               )}
+              {activeTab === 'overview' && (
+                <OverviewView topic={topic} />
+              )}
               {activeTab === 'argument-map' && (
-                <ArgumentMapView nodes={topic.argumentMap} />
+                <ArgumentMapView nodes={topic.argumentMap} onSwitchToThread={handleSwitchToThread} />
               )}
             </div>
 
