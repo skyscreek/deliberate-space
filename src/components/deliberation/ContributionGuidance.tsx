@@ -1,6 +1,6 @@
 import { GuidanceItem } from '@/types/discussion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, AlertTriangle, Search, Eye, Lightbulb } from 'lucide-react';
+import { ChevronDown, AlertTriangle, Search, Eye, Lightbulb, MessageSquare, ArrowRightLeft, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 
 const icons = {
