@@ -20,7 +20,7 @@ import { useAnalysis, AIAnalysis } from '@/hooks/useAnalysis';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import OverviewView from '@/components/discussion/OverviewView';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
-import ArgumentGraph from '@/components/graphs/ArgumentGraph';
+import ArgdownMapView from '@/components/graphs/ArgdownMapView';
 import { Topic, ArgumentNode, Tension, ArgumentCluster, OpenQuestion, GuidanceItem, DiscussionSummaryData, EmergingProposal } from '@/types/discussion';
 
 const argdownColors: Partial<Record<string, string>> = {
