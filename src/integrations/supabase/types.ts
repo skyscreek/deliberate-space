@@ -14,7 +14,246 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_analyses: {
+        Row: {
+          analysis_type: string
+          content: Json
+          created_at: string
+          id: string
+          model: string | null
+          topic_id: string
+        }
+        Insert: {
+          analysis_type: string
+          content?: Json
+          created_at?: string
+          id?: string
+          model?: string | null
+          topic_id: string
+        }
+        Update: {
+          analysis_type?: string
+          content?: Json
+          created_at?: string
+          id?: string
+          model?: string | null
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analyses_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          argdown_type: Database["public"]["Enums"]["argdown_type"] | null
+          author_id: string
+          content: string
+          created_at: string
+          depth: number
+          id: string
+          parent_post_id: string | null
+          score: number
+          topic_id: string
+          updated_at: string
+        }
+        Insert: {
+          argdown_type?: Database["public"]["Enums"]["argdown_type"] | null
+          author_id: string
+          content: string
+          created_at?: string
+          depth?: number
+          id?: string
+          parent_post_id?: string | null
+          score?: number
+          topic_id: string
+          updated_at?: string
+        }
+        Update: {
+          argdown_type?: Database["public"]["Enums"]["argdown_type"] | null
+          author_id?: string
+          content?: string
+          created_at?: string
+          depth?: number
+          id?: string
+          parent_post_id?: string | null
+          score?: number
+          topic_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_parent_post_id_fkey"
+            columns: ["parent_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      topic_relations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          relation_type: string
+          source_topic_id: string
+          target_topic_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relation_type: string
+          source_topic_id: string
+          target_topic_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          relation_type?: string
+          source_topic_id?: string
+          target_topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topic_relations_source_topic_id_fkey"
+            columns: ["source_topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "topic_relations_target_topic_id_fkey"
+            columns: ["target_topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      topics: {
+        Row: {
+          author_id: string
+          canonical_topic_id: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          proposal: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          canonical_topic_id?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          proposal?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          canonical_topic_id?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          proposal?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topics_canonical_topic_id_fkey"
+            columns: ["canonical_topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      votes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +262,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      argdown_type:
+        | "claim"
+        | "support"
+        | "objection"
+        | "concern"
+        | "alternative"
+        | "question"
+        | "proposal"
+        | "evidence"
+        | "rebuttal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +398,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      argdown_type: [
+        "claim",
+        "support",
+        "objection",
+        "concern",
+        "alternative",
+        "question",
+        "proposal",
+        "evidence",
+        "rebuttal",
+      ],
+    },
   },
 } as const
