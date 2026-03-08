@@ -550,10 +550,11 @@ function buildTopicForViews(
 }
 
 function DiscussionContent() {
-  const { id } = useParams();
-  const { data: topic, isLoading: topicLoading } = useTopic(id);
-  const { data: posts, isLoading: postsLoading } = usePosts(id);
-  const { data: analysisData } = useAnalysis(id);
+  const { slug } = useParams();
+  const { data: topic, isLoading: topicLoading } = useTopic(slug);
+  const topicId = topic?.id;
+  const { data: posts, isLoading: postsLoading } = usePosts(topicId);
+  const { data: analysisData } = useAnalysis(topicId);
   const [activeTab, setActiveTab] = useState('discussion');
   const [argMapFilter, setArgMapFilter] = useState<string | undefined>();
   const { scrollToPost } = useDiscussion();
