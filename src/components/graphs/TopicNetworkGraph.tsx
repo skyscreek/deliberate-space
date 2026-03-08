@@ -98,7 +98,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const graphRef = useRef<Graph | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<string | null>(mode === 'local' ? currentTopicId || null : null);
   const [expanded, setExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -516,7 +516,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       fullHeight && 'h-full',
     )}>
       <div ref={containerRef} className="w-full h-full" style={{
-        minHeight: fullHeight ? undefined : expanded ? '100vh' : '560px',
+        minHeight: fullHeight ? undefined : expanded ? '100vh' : (height || '560px'),
         background: CANVAS_BG,
       }} />
 
