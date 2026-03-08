@@ -1,9 +1,32 @@
 import { useRef, useEffect, useState } from 'react';
-import { Post, Reply } from '@/types/discussion';
+import { Post, Reply, ArgdownType } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
 import { ChevronUp, ChevronDown, MessageSquare, CornerDownRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+const argdownConfig: Record<string, { label: string; color: string; bg: string }> = {
+  claim:       { label: 'Claim',       color: 'text-argdown-claim',       bg: 'bg-argdown-claim/10' },
+  support:     { label: 'Support',     color: 'text-argdown-support',     bg: 'bg-argdown-support/10' },
+  objection:   { label: 'Objection',   color: 'text-argdown-objection',   bg: 'bg-argdown-objection/10' },
+  concern:     { label: 'Concern',     color: 'text-argdown-concern',     bg: 'bg-argdown-concern/10' },
+  alternative: { label: 'Alternative', color: 'text-argdown-alternative', bg: 'bg-argdown-alternative/10' },
+  question:    { label: 'Question',    color: 'text-argdown-question',    bg: 'bg-argdown-question/10' },
+  proposal:    { label: 'Proposal',    color: 'text-argdown-proposal',    bg: 'bg-argdown-proposal/10' },
+  evidence:    { label: 'Evidence',    color: 'text-argdown-support',     bg: 'bg-argdown-support/10' },
+  rebuttal:    { label: 'Rebuttal',    color: 'text-argdown-objection',   bg: 'bg-argdown-objection/10' },
+};
+
+function ArgdownBadge({ type }: { type?: ArgdownType }) {
+  if (!type) return null;
+  const config = argdownConfig[type];
+  if (!config) return null;
+  return (
+    <span className={cn('argdown-badge', config.color, config.bg)}>
+      {config.label}
+    </span>
+  );
+}
 
 function UserAvatar({ author, size = 'md' }: { author: Post['author']; size?: 'sm' | 'md' }) {
   const dim = size === 'sm' ? 'h-6 w-6 text-[9px]' : 'h-8 w-8 text-[10px]';
@@ -20,11 +43,11 @@ function UserAvatar({ author, size = 'md' }: { author: Post['author']; size?: 's
 function VoteColumn({ score }: { score: number }) {
   return (
     <div className="flex flex-col items-center gap-0.5 pt-1 min-w-[2rem]">
-      <button className="p-0.5 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-vote-up">
+      <button className="p-0.5 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-vote-up">
         <ChevronUp className="h-4 w-4" />
       </button>
       <span className="text-xs font-bold text-foreground tabular-nums">{score}</span>
-      <button className="p-0.5 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-vote-down">
+      <button className="p-0.5 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-vote-down">
         <ChevronDown className="h-4 w-4" />
       </button>
     </div>
@@ -39,10 +62,9 @@ function ReplyBranch({ reply, depth = 0 }: { reply: Reply; depth?: number }) {
 
   return (
     <div className={cn('relative', depth > 0 && 'ml-4')}>
-      {/* Thread line */}
       <div className="absolute left-3 top-8 bottom-0 w-px bg-thread-line" />
 
-      <div className="flex gap-2.5 pt-2">
+      <div className="flex gap-2.5 pt-2.5">
         <div className="flex flex-col items-center shrink-0">
           <UserAvatar author={reply.author} size="sm" />
         </div>
@@ -50,12 +72,13 @@ function ReplyBranch({ reply, depth = 0 }: { reply: Reply; depth?: number }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-foreground">{reply.author.name}</span>
+            <ArgdownBadge type={reply.argdownType} />
             {reply.author.role && <span className="text-[10px] text-muted-foreground">{reply.author.role}</span>}
             <span className="text-[10px] text-muted-foreground">· {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
           </div>
           <p className="mt-1 text-sm leading-relaxed text-foreground/90">{reply.content}</p>
 
-          <div className="mt-1.5 flex items-center gap-2.5">
+          <div className="mt-1.5 flex items-center gap-3">
             <div className="flex items-center gap-1">
               <button className="p-0 text-muted-foreground hover:text-vote-up transition-colors">
                 <ChevronUp className="h-3.5 w-3.5" />
@@ -117,14 +140,14 @@ export default function PostCard({ post }: { post: Post }) {
       ref={ref}
       id={`post-${post.id}`}
       className={cn(
-        'rounded-lg border bg-card transition-all duration-300 shadow-sm',
+        'glass rounded-lg transition-all duration-300',
         isHighlighted && 'ring-2 ring-highlight bg-highlight-bg',
         isDimmed && 'opacity-35',
       )}
     >
       <div className="flex">
         {/* Vote column */}
-        <div className="border-r bg-secondary/30 px-1 py-3 rounded-l-lg">
+        <div className="border-r border-border/50 bg-accent/20 px-1 py-3 rounded-l-lg">
           <VoteColumn score={post.score} />
         </div>
 
@@ -132,11 +155,12 @@ export default function PostCard({ post }: { post: Post }) {
         <div className="flex-1 min-w-0 p-4">
           <div className="flex items-center gap-2.5 flex-wrap">
             <UserAvatar author={post.author} />
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground">{post.author.name}</span>
+                <ArgdownBadge type={post.argdownType} />
                 {post.author.role && (
-                  <span className="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">{post.author.role}</span>
+                  <span className="text-xs text-muted-foreground bg-accent px-1.5 py-0.5 rounded-full">{post.author.role}</span>
                 )}
               </div>
               <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
@@ -145,9 +169,9 @@ export default function PostCard({ post }: { post: Post }) {
 
           <p className="mt-3 text-sm leading-relaxed text-foreground">{post.content}</p>
 
-          <div className="mt-3 flex items-center gap-3 flex-wrap border-t pt-2.5">
+          <div className="mt-3 flex items-center gap-3 flex-wrap border-t border-border/50 pt-2.5">
             {post.reactions.filter(r => r.count > 0).map((r) => (
-              <button key={r.type} className="flex items-center gap-1 rounded-full border bg-secondary/50 px-2.5 py-1 text-xs hover:bg-secondary transition-colors">
+              <button key={r.type} className="flex items-center gap-1 rounded-full border border-border/50 bg-accent/30 px-2.5 py-1 text-xs hover:bg-accent transition-colors">
                 <span>{reactionEmoji[r.type]}</span>
                 <span className="text-muted-foreground font-medium">{r.count}</span>
               </button>
@@ -161,7 +185,6 @@ export default function PostCard({ post }: { post: Post }) {
             </button>
           </div>
 
-          {/* Replies with thread lines */}
           {showReplies && post.replies.length > 0 && (
             <div className="mt-2 relative">
               {post.replies.map((reply) => (

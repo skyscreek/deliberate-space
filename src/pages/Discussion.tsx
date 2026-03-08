@@ -33,7 +33,7 @@ export default function Discussion() {
     <DiscussionProvider>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="border-b bg-card sticky top-0 z-30 shadow-sm">
+        <header className="glass-strong sticky top-0 z-30 border-b">
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
             <Link to="/" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
@@ -41,15 +41,14 @@ export default function Discussion() {
               <span className="font-bold text-sm text-foreground">Delibera</span>
             </Link>
 
-            {/* Mobile sidebar trigger */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="ml-auto lg:hidden">
+                <Button variant="outline" size="sm" className="ml-auto lg:hidden glass-subtle">
                   <PanelRightOpen className="h-4 w-4 mr-1" />
                   Insights
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] p-0">
+              <SheetContent side="right" className="w-[300px] p-0 glass-strong">
                 <SheetTitle className="sr-only">Discussion Insights</SheetTitle>
                 <div className="flex items-center justify-between border-b px-4 py-3">
                   <h2 className="text-sm font-semibold text-foreground">Discussion Insights</h2>
@@ -74,12 +73,13 @@ export default function Discussion() {
             <ProposalPrompt text={topic.proposal} />
           </div>
 
-          {/* Discussion Overview — above thread */}
+          {/* Discussion Insights — above thread */}
           <div className="max-w-3xl mb-5">
             <DiscussionOverview
               summary={topic.summary}
               tensions={topic.tensions}
               openQuestions={topic.openQuestions}
+              guidance={topic.guidance}
             />
           </div>
 
@@ -109,7 +109,6 @@ export default function Discussion() {
 
           {/* Two-column layout */}
           <div className="flex gap-6 items-start">
-            {/* Main column */}
             <div className="flex-1 min-w-0 max-w-3xl space-y-4">
               {activeTab === 'thread' && (
                 <>
@@ -126,6 +125,7 @@ export default function Discussion() {
                     summary={topic.summary}
                     tensions={topic.tensions}
                     openQuestions={topic.openQuestions}
+                    guidance={topic.guidance}
                   />
                 </div>
               )}
@@ -134,9 +134,9 @@ export default function Discussion() {
               )}
             </div>
 
-            {/* Sidebar — slim, supportive */}
+            {/* Sidebar */}
             <aside className="hidden lg:block w-60 shrink-0 sticky top-20">
-              <div className="rounded-lg border bg-card shadow-sm p-3 space-y-1">
+              <div className="glass rounded-lg p-3 space-y-1">
                 <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Discussion Insights</h2>
                 <DeliberationSidebar topic={topic} />
               </div>

@@ -6,7 +6,7 @@ import { Sparkles } from 'lucide-react';
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card shadow-sm">
+      <header className="glass-strong border-b">
         <div className="mx-auto max-w-3xl px-4 py-5">
           <div className="flex items-center gap-2.5">
             <Sparkles className="h-6 w-6 text-primary" />
@@ -17,11 +17,11 @@ const Index = () => {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-          <div className="border-b bg-secondary/50 px-4 py-2.5">
+        <div className="glass rounded-lg overflow-hidden">
+          <div className="border-b border-border/50 bg-accent/30 px-4 py-2.5">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Discussions</h2>
           </div>
-          <div className="divide-y">
+          <div className="divide-y divide-border/50">
             {stubTopics.map((topic) => (
               <TopicCard key={topic.id} topic={topic} preview={topicDeliberationPreviews[topic.id]} />
             ))}
