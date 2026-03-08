@@ -38,9 +38,9 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
   const actionableGuidance = guidance.filter(g => g.type !== 'overrepresented');
 
   return (
-    <div className="surface-insights overflow-hidden">
+    <div className="surface-card-elevated overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: 'hsl(var(--insights-border))' }}>
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50">
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-semibold" style={{ color: 'hsl(var(--insights-header))' }}>Discussion Insights</span>
         <span className="text-[10px] text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded font-medium">AI</span>
