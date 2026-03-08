@@ -4,14 +4,14 @@ import { useDiscussion } from '@/context/DiscussionContext';
 import { cn } from '@/lib/utils';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 
-const nodeConfig: Record<ArgumentNode['type'], { label: string; color: string; bg: string; border: string }> = {
-  claim:       { label: 'Claim',       color: 'text-argdown-claim',       bg: 'bg-card',   border: 'border-argdown-claim/30' },
-  support:     { label: 'Support',     color: 'text-argdown-support',     bg: 'bg-card',   border: 'border-argdown-support/30' },
-  objection:   { label: 'Objection',   color: 'text-argdown-objection',   bg: 'bg-card',   border: 'border-argdown-objection/30' },
-  concern:     { label: 'Concern',     color: 'text-argdown-concern',     bg: 'bg-card',   border: 'border-argdown-concern/30' },
-  alternative: { label: 'Alternative', color: 'text-argdown-alternative', bg: 'bg-card',   border: 'border-argdown-alternative/30' },
-  question:    { label: 'Question',    color: 'text-argdown-question',    bg: 'bg-card',   border: 'border-argdown-question/30' },
-  proposal:    { label: 'Proposal',    color: 'text-argdown-proposal',    bg: 'bg-card',   border: 'border-argdown-proposal/30' },
+const nodeConfig: Record<ArgumentNode['type'], { label: string; color: string; accent: string; borderAccent: string }> = {
+  claim:       { label: 'Claim',       color: 'text-argdown-claim',       accent: 'border-l-argdown-claim',       borderAccent: 'border-argdown-claim/30' },
+  support:     { label: 'Support',     color: 'text-argdown-support',     accent: 'border-l-argdown-support',     borderAccent: 'border-argdown-support/30' },
+  objection:   { label: 'Objection',   color: 'text-argdown-objection',   accent: 'border-l-argdown-objection',   borderAccent: 'border-argdown-objection/30' },
+  concern:     { label: 'Concern',     color: 'text-argdown-concern',     accent: 'border-l-argdown-concern',     borderAccent: 'border-argdown-concern/30' },
+  alternative: { label: 'Alternative', color: 'text-argdown-alternative', accent: 'border-l-argdown-alternative', borderAccent: 'border-argdown-alternative/30' },
+  question:    { label: 'Question',    color: 'text-argdown-question',    accent: 'border-l-argdown-question',    borderAccent: 'border-argdown-question/30' },
+  proposal:    { label: 'Proposal',    color: 'text-argdown-proposal',    accent: 'border-l-argdown-proposal',    borderAccent: 'border-argdown-proposal/30' },
 };
 
 const statusLabels: Record<string, string> = {
@@ -22,38 +22,51 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
   const [expanded, setExpanded] = useState(depth < 2);
   const config = nodeConfig[node.type];
   const hasChildren = node.children.length > 0;
+  const isRoot = depth === 0;
 
   return (
-    <div className={cn(depth > 0 && 'ml-4 relative')}>
-      {depth > 0 && <div className="absolute left-[-8px] top-0 bottom-0 w-px bg-border" />}
-      {depth > 0 && <div className="absolute left-[-8px] top-[14px] w-2 h-px bg-border" />}
+    <div className={cn(!isRoot && 'ml-5 relative')}>
+      {/* Connector lines for nested nodes */}
+      {!isRoot && <div className="absolute left-[-12px] top-0 bottom-0 w-px bg-border" />}
+      {!isRoot && <div className="absolute left-[-12px] top-[18px] w-3 h-px bg-border" />}
 
-      <div className={cn('rounded-md border shadow-sm transition-all', config.bg, config.border)}>
+      <div
+        className={cn(
+          'rounded-lg transition-all',
+          isRoot
+            ? 'surface-card-elevated'
+            : cn('border-l-2 bg-accent/40', config.accent),
+        )}
+      >
         <div
-          className={cn('flex items-start gap-2 px-3 py-3.5', hasChildren && 'cursor-pointer')}
+          className={cn(
+            'flex items-start gap-2.5',
+            isRoot ? 'px-4 py-4' : 'px-3.5 py-3',
+            hasChildren && 'cursor-pointer',
+          )}
           onClick={() => hasChildren && setExpanded(!expanded)}
         >
           {hasChildren && (
             <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
           )}
-          {!hasChildren && <div className="w-3 shrink-0" />}
+          {!hasChildren && <div className="w-3.5 shrink-0" />}
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className={cn('text-[10px] font-semibold uppercase tracking-wider', config.color)}>{config.label}</span>
               {node.status && (
                 <span className="text-[10px] text-muted-foreground">{statusLabels[node.status]}</span>
               )}
               {node.author && <span className="text-[10px] text-muted-foreground">· {node.author}</span>}
             </div>
-            <p className={cn('mt-0.5 text-foreground leading-relaxed', depth === 0 ? 'text-sm font-medium' : 'text-[13px]')}>
+            <p className={cn('mt-1 text-foreground leading-relaxed', isRoot ? 'text-sm font-medium' : 'text-[13px]')}>
               {node.text}
             </p>
 
-            {/* Strength + thread refs in compact row */}
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {/* Strength + thread refs */}
+            <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
               {node.strength != null && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <div className="h-1.5 rounded-full bg-border w-12">
                     <div className="h-full rounded-full bg-argdown-support" style={{ width: `${Math.round(node.strength * 100)}%` }} />
                   </div>
@@ -64,9 +77,9 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
                 <button
                   key={pid}
                   onClick={(e) => { e.stopPropagation(); switchToThread(pid); }}
-                  className="inline-flex items-center gap-0.5 text-[10px] text-primary/60 hover:text-primary font-medium transition-colors"
+                  className="inline-flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary font-medium transition-colors"
                 >
-                  <ExternalLink className="h-2 w-2" />{pid}
+                  <ExternalLink className="h-2.5 w-2.5" />{pid}
                 </button>
               ))}
               {hasChildren && !expanded && (
@@ -76,8 +89,12 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
           </div>
         </div>
 
+        {/* Children — inside the card for root, separate area for nested */}
         {hasChildren && expanded && (
-          <div className="pb-2.5 px-2.5 space-y-2 border-t border-border/40 pt-2 ml-3">
+          <div className={cn(
+            'space-y-2',
+            isRoot ? 'px-4 pb-4 pt-2 border-t border-border/40 ml-2' : 'px-3 pb-3 pt-1.5 ml-2',
+          )}>
             {node.children.map((child) => (
               <ArgumentNodeCard key={child.id} node={child} depth={depth + 1} switchToThread={switchToThread} />
             ))}
@@ -112,30 +129,32 @@ export default function ArgumentMapView({ nodes, onSwitchToThread }: { nodes: Ar
   });
 
   return (
-    <div className="space-y-3">
-      {/* Compact filter */}
-      <div className="flex items-center gap-1 flex-wrap">
-        <button
-          onClick={() => setFilter('all')}
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors',
-            filter === 'all' ? 'border-primary/20 bg-primary/5 text-foreground' : 'border-border/30 text-muted-foreground/50 hover:border-border/50',
-          )}
-        >All</button>
-        {Object.entries(nodeConfig).map(([type, c]) => {
-          const count = typeCounts[type] || 0;
-          if (count === 0) return null;
-          return (
-            <button
-              key={type}
-              onClick={() => setFilter(type as FilterType)}
-              className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-medium border transition-colors',
-                filter === type ? `${c.bg} ${c.border} ${c.color}` : 'border-border/30 text-muted-foreground/50 hover:border-border/50',
-              )}
-            >{c.label} {count}</button>
-          );
-        })}
+    <div className="space-y-4">
+      {/* Filter bar inside card */}
+      <div className="surface-card-elevated px-4 py-3">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setFilter('all')}
+            className={cn(
+              'rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors',
+              filter === 'all' ? 'border-foreground/20 bg-foreground/5 text-foreground' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/20',
+            )}
+          >All</button>
+          {Object.entries(nodeConfig).map(([type, c]) => {
+            const count = typeCounts[type] || 0;
+            if (count === 0) return null;
+            return (
+              <button
+                key={type}
+                onClick={() => setFilter(type as FilterType)}
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors',
+                  filter === type ? cn(c.borderAccent, c.color) : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/20',
+                )}
+              >{c.label} {count}</button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tree */}
@@ -144,7 +163,9 @@ export default function ArgumentMapView({ nodes, onSwitchToThread }: { nodes: Ar
           <ArgumentNodeCard key={node.id} node={node} depth={0} switchToThread={switchToThread} />
         ))}
         {filteredNodes.length === 0 && (
-          <p className="text-center py-6 text-sm text-muted-foreground/50">No arguments matching this filter.</p>
+          <div className="surface-card-elevated p-8 text-center">
+            <p className="text-sm text-muted-foreground">No arguments matching this filter.</p>
+          </div>
         )}
       </div>
     </div>
