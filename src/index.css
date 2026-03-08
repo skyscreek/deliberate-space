@@ -2,101 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 220 14% 96%;
-    --foreground: 224 30% 12%;
+    --background: 225 20% 95%;
+    --foreground: 224 30% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 224 30% 12%;
+    --card: 0 0% 100% / 0.55;
+    --card-foreground: 224 30% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 30% 12%;
+    --popover: 0 0% 100% / 0.75;
+    --popover-foreground: 224 30% 10%;
 
-    --primary: 222 60% 45%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 230 65% 52%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 92%;
-    --secondary-foreground: 224 30% 12%;
+    --secondary: 225 25% 90% / 0.6;
+    --secondary-foreground: 224 30% 10%;
 
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 10% 44%;
+    --muted: 225 20% 88% / 0.5;
+    --muted-foreground: 220 12% 42%;
 
-    --accent: 220 14% 89%;
-    --accent-foreground: 224 30% 12%;
+    --accent: 225 30% 85% / 0.4;
+    --accent-foreground: 224 30% 10%;
 
     --destructive: 0 72% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 86%;
-    --input: 220 14% 86%;
-    --ring: 222 60% 45%;
+    --border: 225 20% 80% / 0.45;
+    --input: 225 20% 82% / 0.5;
+    --ring: 230 65% 52%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 220 14% 93%;
-    --sidebar-foreground: 220 10% 30%;
-    --sidebar-primary: 222 60% 45%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 220 14% 89%;
-    --sidebar-accent-foreground: 220 10% 20%;
-    --sidebar-border: 220 14% 86%;
-    --sidebar-ring: 222 60% 45%;
+    --sidebar-background: 225 25% 92% / 0.4;
+    --sidebar-foreground: 220 12% 28%;
+    --sidebar-primary: 230 65% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 225 25% 86% / 0.4;
+    --sidebar-accent-foreground: 220 12% 20%;
+    --sidebar-border: 225 20% 80% / 0.35;
+    --sidebar-ring: 230 65% 52%;
 
-    --vote-up: 142 60% 40%;
-    --vote-down: 0 72% 50%;
-    --thread-line: 220 14% 82%;
-    --highlight: 40 90% 56%;
-    --highlight-bg: 40 80% 95%;
+    --vote-up: 152 60% 38%;
+    --vote-down: 0 68% 52%;
+    --thread-line: 225 20% 78% / 0.5;
+    --highlight: 42 92% 56%;
+    --highlight-bg: 42 80% 94% / 0.6;
+
+    --glass-bg: 0 0% 100% / 0.45;
+    --glass-border: 0 0% 100% / 0.35;
+    --glass-blur: 20px;
+    --glass-shadow: 0 8px 32px -8px hsl(225 40% 20% / 0.08), 0 2px 8px -2px hsl(225 40% 20% / 0.04);
+    --glass-shadow-lg: 0 16px 48px -12px hsl(225 40% 20% / 0.12), 0 4px 16px -4px hsl(225 40% 20% / 0.06);
+    --glass-highlight: linear-gradient(135deg, hsl(0 0% 100% / 0.5) 0%, hsl(0 0% 100% / 0.1) 50%, transparent 100%);
+
+    --argdown-claim: 230 65% 52%;
+    --argdown-support: 152 55% 42%;
+    --argdown-objection: 0 68% 52%;
+    --argdown-concern: 38 85% 52%;
+    --argdown-alternative: 270 55% 55%;
+    --argdown-question: 42 92% 48%;
+    --argdown-proposal: 200 70% 50%;
   }
 
   .dark {
-    --background: 224 30% 8%;
+    --background: 225 28% 7%;
     --foreground: 210 20% 92%;
 
-    --card: 224 24% 12%;
+    --card: 225 24% 12% / 0.55;
     --card-foreground: 210 20% 92%;
 
-    --popover: 224 24% 12%;
+    --popover: 225 24% 14% / 0.75;
     --popover-foreground: 210 20% 92%;
 
-    --primary: 218 70% 60%;
-    --primary-foreground: 224 30% 8%;
+    --primary: 220 75% 62%;
+    --primary-foreground: 225 28% 7%;
 
-    --secondary: 220 18% 18%;
+    --secondary: 225 20% 18% / 0.5;
     --secondary-foreground: 210 20% 92%;
 
-    --muted: 220 18% 18%;
-    --muted-foreground: 220 12% 58%;
+    --muted: 225 18% 16% / 0.5;
+    --muted-foreground: 220 14% 56%;
 
-    --accent: 220 18% 22%;
+    --accent: 225 20% 22% / 0.4;
     --accent-foreground: 210 20% 92%;
 
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 60% 42%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 18% 22%;
-    --input: 220 18% 22%;
-    --ring: 218 70% 60%;
+    --border: 225 18% 24% / 0.5;
+    --input: 225 18% 22% / 0.5;
+    --ring: 220 75% 62%;
 
-    --sidebar-background: 224 24% 10%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 218 70% 60%;
+    --sidebar-background: 225 24% 10% / 0.4;
+    --sidebar-foreground: 210 20% 82%;
+    --sidebar-primary: 220 75% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 18% 18%;
-    --sidebar-accent-foreground: 210 20% 85%;
-    --sidebar-border: 220 18% 22%;
-    --sidebar-ring: 218 70% 60%;
+    --sidebar-accent: 225 20% 18% / 0.4;
+    --sidebar-accent-foreground: 210 20% 82%;
+    --sidebar-border: 225 18% 24% / 0.35;
+    --sidebar-ring: 220 75% 62%;
 
-    --vote-up: 142 50% 50%;
-    --vote-down: 0 60% 55%;
-    --thread-line: 220 18% 26%;
-    --highlight: 40 80% 50%;
-    --highlight-bg: 40 40% 15%;
+    --vote-up: 152 50% 48%;
+    --vote-down: 0 58% 55%;
+    --thread-line: 225 18% 28% / 0.5;
+    --highlight: 42 80% 50%;
+    --highlight-bg: 42 40% 14% / 0.5;
+
+    --glass-bg: 225 24% 14% / 0.4;
+    --glass-border: 225 18% 28% / 0.3;
+    --glass-blur: 20px;
+    --glass-shadow: 0 8px 32px -8px hsl(0 0% 0% / 0.3), 0 2px 8px -2px hsl(0 0% 0% / 0.2);
+    --glass-shadow-lg: 0 16px 48px -12px hsl(0 0% 0% / 0.4), 0 4px 16px -4px hsl(0 0% 0% / 0.25);
+    --glass-highlight: linear-gradient(135deg, hsl(0 0% 100% / 0.08) 0%, hsl(0 0% 100% / 0.02) 50%, transparent 100%);
+
+    --argdown-claim: 220 75% 62%;
+    --argdown-support: 152 50% 48%;
+    --argdown-objection: 0 58% 55%;
+    --argdown-concern: 38 75% 55%;
+    --argdown-alternative: 270 50% 60%;
+    --argdown-question: 42 80% 50%;
+    --argdown-proposal: 200 65% 55%;
   }
 }
 
@@ -108,5 +134,46 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  .glass {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--glass-shadow);
+  }
+
+  .glass-strong {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--glass-shadow-lg);
+  }
+
+  .glass-subtle {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  .glass-inner-highlight {
+    position: relative;
+  }
+  .glass-inner-highlight::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--glass-highlight);
+    pointer-events: none;
+  }
+
+  .argdown-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider;
   }
 }
