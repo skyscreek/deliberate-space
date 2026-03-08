@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArgumentNode } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
 import { cn } from '@/lib/utils';
@@ -110,6 +110,10 @@ type FilterType = 'all' | ArgumentNode['type'];
 export default function ArgumentMapView({ nodes, onSwitchToThread, initialFilter }: { nodes: ArgumentNode[]; onSwitchToThread?: (postId: string) => void; initialFilter?: string }) {
   const { scrollToPost } = useDiscussion();
   const [filter, setFilter] = useState<FilterType>(initialFilter as FilterType || 'all');
+
+  useEffect(() => {
+    if (initialFilter) setFilter(initialFilter as FilterType);
+  }, [initialFilter]);
 
   const switchToThread = (postId: string) => {
     if (onSwitchToThread) onSwitchToThread(postId);
