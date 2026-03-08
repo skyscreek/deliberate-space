@@ -581,7 +581,7 @@ function DiscussionContent() {
     <div className="space-y-5">
       <TopicHeaderLive topic={{ ...topic, post_count: posts?.length, participant_count: topicForViews.participantCount }} />
       
-      <DeliberationPanel topicId={id!} postCount={posts?.length ?? 0} />
+      <DeliberationPanel topicId={topicId!} postCount={posts?.length ?? 0} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full">
@@ -598,7 +598,7 @@ function DiscussionContent() {
           ) : (
             <div className="space-y-3">
               {posts?.map(post => (
-                <PostCard key={post.id} post={post} topicId={id!} />
+                <PostCard key={post.id} post={post} topicId={topicId!} />
               ))}
               {posts?.length === 0 && (
                 <div className="surface-card-elevated p-8 text-center">
@@ -607,7 +607,7 @@ function DiscussionContent() {
               )}
             </div>
           )}
-          <TopLevelComposer topicId={id!} />
+          <TopLevelComposer topicId={topicId!} />
         </TabsContent>
 
         <TabsContent value="overview">
