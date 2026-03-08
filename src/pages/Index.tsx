@@ -45,12 +45,12 @@ function TopicCardLive({ topic }: { topic: TopicRow }) {
           <p className="text-sm text-muted-foreground leading-relaxed mb-3 line-clamp-2">{topic.description}</p>
         )}
         <div className="flex items-center gap-3.5 text-xs text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1.5">
+          <Link to={`/profile/${topic.author_id}`} className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
             <div className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold text-primary-foreground bg-primary shrink-0">
               {initials}
             </div>
-            <span className="font-medium text-foreground/80">{authorName}</span>
-          </span>
+            <span className="font-medium text-foreground/80 hover:text-primary transition-colors">{authorName}</span>
+          </Link>
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{topic.participant_count}</span>
           <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" />{topic.post_count} posts</span>
           <span className="flex items-center gap-1">
