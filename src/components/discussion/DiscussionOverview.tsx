@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DiscussionSummaryData, Tension, OpenQuestion, GuidanceItem } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
-import { Sparkles, ChevronDown, AlertTriangle, HelpCircle, Lightbulb, Compass } from 'lucide-react';
+import { Sparkles, ChevronDown, AlertTriangle, HelpCircle, Lightbulb, Compass, ArrowRight, Swords, MessageCircleQuestion } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +43,83 @@ function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: 
         return <span key={i}>{part}</span>;
       })}
     </p>
+  );
+}
+
+/** Tension card: "Side A  vs  Side B" layout */
+function TensionItem({ tension, isActive, onToggle }: { tension: Tension; isActive: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        'w-full text-left rounded-lg border transition-all hover:shadow-sm',
+        isActive
+          ? 'ring-2 ring-argdown-concern/30 border-argdown-concern/40 bg-argdown-concern/5'
+          : 'border-border/60 hover:border-argdown-concern/30 bg-card',
+      )}
+    >
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1.5">
+          <Swords className="h-3 w-3 text-argdown-concern" />
+          <span className="font-medium uppercase tracking-wider">Tension</span>
+          <span className="ml-auto">{tension.relatedPostIds.length} posts</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex-1 text-xs font-medium text-foreground/90 text-center bg-accent/50 rounded px-2 py-1.5 leading-snug">
+            {tension.sideA}
+          </span>
+          <span className="text-[10px] font-bold text-argdown-concern shrink-0">vs</span>
+          <span className="flex-1 text-xs font-medium text-foreground/90 text-center bg-accent/50 rounded px-2 py-1.5 leading-snug">
+            {tension.sideB}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** Question card: styled as a question with ? icon */
+function QuestionItem({ question, onClick }: { question: OpenQuestion; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-lg border border-argdown-question/20 bg-argdown-question/5 hover:border-argdown-question/40 transition-all hover:shadow-sm px-3 py-2.5 group"
+    >
+      <div className="flex items-start gap-2">
+        <MessageCircleQuestion className="h-4 w-4 text-argdown-question shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-foreground/90 leading-snug">{question.question}</p>
+          {question.raisedBy && (
+            <span className="text-[11px] text-muted-foreground mt-1 block">Asked by {question.raisedBy}</span>
+          )}
+        </div>
+        <ArrowRight className="h-3 w-3 text-muted-foreground/50 group-hover:text-argdown-question shrink-0 mt-1 transition-colors" />
+      </div>
+    </button>
+  );
+}
+
+/** Proposal card: distinct with lightbulb and supporters */
+function ProposalItem({ proposal, onClick }: { proposal: { id: string; title: string; description: string; supportedBy: string[]; relatedPostIds: string[] }; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left rounded-lg border border-argdown-proposal/20 bg-argdown-proposal/5 hover:border-argdown-proposal/40 transition-all hover:shadow-sm px-3 py-2.5 group"
+    >
+      <div className="flex items-start gap-2">
+        <Lightbulb className="h-4 w-4 text-argdown-proposal shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-foreground/90">{proposal.title}</p>
+          <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{proposal.description}</p>
+          {proposal.supportedBy.length > 0 && (
+            <div className="flex items-center gap-1 mt-1.5 text-[10px] text-argdown-proposal/80">
+              <span className="font-medium">Supported by:</span>
+              <span className="text-muted-foreground">{proposal.supportedBy.join(', ')}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -88,7 +165,7 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
           </AccordionContent>
         </AccordionItem>
 
-        {/* Key Tensions */}
+        {/* Key Tensions — "sideA vs sideB" cards */}
         <AccordionItem value="tensions" className="border-0">
           <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
             <span className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -97,27 +174,24 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
               <span className="text-muted-foreground font-normal ml-0.5">{tensions.length}</span>
             </span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3 space-y-1">
-            {tensions.map((t) => {
-              const isActive = activeFilter?.type === 'tension' && activeFilter.id === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => isActive ? setFilter(null) : setFilter({ type: 'tension', id: t.id, relatedPostIds: t.relatedPostIds })}
-                  className={cn(
-                    'w-full text-left rounded-md px-2.5 py-2 text-xs transition-all hover:bg-accent/40',
-                    isActive && 'ring-1 ring-highlight/50 bg-highlight-bg',
-                  )}
-                >
-                  <span className="text-foreground/90 font-medium block leading-snug">{t.label}</span>
-                  <span className="text-muted-foreground text-[11px]">{t.relatedPostIds.length} posts involved</span>
-                </button>
-              );
-            })}
+          <AccordionContent className="px-4 pb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {tensions.map((t) => {
+                const isActive = activeFilter?.type === 'tension' && activeFilter.id === t.id;
+                return (
+                  <TensionItem
+                    key={t.id}
+                    tension={t}
+                    isActive={isActive}
+                    onToggle={() => isActive ? setFilter(null) : setFilter({ type: 'tension', id: t.id, relatedPostIds: t.relatedPostIds })}
+                  />
+                );
+              })}
+            </div>
           </AccordionContent>
         </AccordionItem>
 
-        {/* Open Questions */}
+        {/* Open Questions — question-mark styled cards */}
         <AccordionItem value="questions" className="border-0">
           <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
             <span className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -126,21 +200,16 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
               <span className="text-muted-foreground font-normal ml-0.5">{openQuestions.length}</span>
             </span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3 space-y-1">
-            {openQuestions.map((q) => (
-              <button
-                key={q.id}
-                onClick={() => scrollToPost(q.raisedInPostId)}
-                className="w-full text-left rounded-md px-2.5 py-2 text-xs hover:bg-accent/40 transition-colors"
-              >
-                <span className="text-foreground/85 block leading-snug">{q.question}</span>
-                {q.raisedBy && <span className="text-muted-foreground text-[11px]">— {q.raisedBy}</span>}
-              </button>
-            ))}
+          <AccordionContent className="px-4 pb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {openQuestions.map((q) => (
+                <QuestionItem key={q.id} question={q} onClick={() => scrollToPost(q.raisedInPostId)} />
+              ))}
+            </div>
           </AccordionContent>
         </AccordionItem>
 
-        {/* Emerging Proposals */}
+        {/* Emerging Proposals — lightbulb styled cards */}
         {summary.emergingProposals.length > 0 && (
           <AccordionItem value="proposals" className="border-0">
             <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
@@ -150,17 +219,16 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
                 <span className="text-muted-foreground font-normal ml-0.5">{summary.emergingProposals.length}</span>
               </span>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-3 space-y-1">
-              {summary.emergingProposals.map((ep) => (
-                <button
-                  key={ep.id}
-                  onClick={() => ep.relatedPostIds[0] && scrollToPost(ep.relatedPostIds[0])}
-                  className="w-full text-left rounded-md px-2.5 py-2 text-xs hover:bg-accent/40 transition-colors"
-                >
-                  <span className="font-semibold text-foreground/90 block">{ep.title}</span>
-                  <span className="text-muted-foreground block mt-0.5 leading-snug">{ep.description}</span>
-                </button>
-              ))}
+            <AccordionContent className="px-4 pb-3">
+              <div className="space-y-2">
+                {summary.emergingProposals.map((ep) => (
+                  <ProposalItem
+                    key={ep.id}
+                    proposal={ep}
+                    onClick={() => ep.relatedPostIds[0] && scrollToPost(ep.relatedPostIds[0])}
+                  />
+                ))}
+              </div>
             </AccordionContent>
           </AccordionItem>
         )}
@@ -176,20 +244,20 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-3">
             <p className="text-[11px] text-muted-foreground mb-2">Click to jump to the relevant place and start contributing.</p>
-            <div className="space-y-0.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {actionableGuidance.map((item) => {
                 const config = guidanceTypeConfig[item.type] || { verb: 'Contribute' };
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleContribute(item)}
-                    className="w-full text-left flex items-start gap-2 rounded-md px-2.5 py-2 text-xs transition-all hover:bg-primary/5 group"
+                    className="w-full text-left flex items-start gap-2 rounded-lg border border-primary/15 bg-primary/[0.03] hover:border-primary/30 hover:bg-primary/5 px-3 py-2.5 transition-all group"
                   >
                     <div className="flex-1 min-w-0">
-                      <span className="text-foreground/90 font-medium block">{item.label}</span>
-                      <span className="text-muted-foreground block leading-snug mt-0.5">{item.description}</span>
+                      <span className="text-xs font-medium text-foreground/90 block">{item.label}</span>
+                      <span className="text-[11px] text-muted-foreground block leading-snug mt-0.5">{item.description}</span>
                     </div>
-                    <span className="text-[11px] text-primary/60 group-hover:text-primary shrink-0 mt-0.5 transition-colors font-medium">{config.verb} →</span>
+                    <span className="text-[10px] text-primary/50 group-hover:text-primary shrink-0 mt-0.5 transition-colors font-semibold whitespace-nowrap">{config.verb} →</span>
                   </button>
                 );
               })}
