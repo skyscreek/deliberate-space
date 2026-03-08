@@ -175,7 +175,8 @@
   }
 
   .glass-strong {
-    @apply bg-card/92 backdrop-blur-lg border border-border/70;
+    background: hsl(var(--card) / 0.92);
+    @apply backdrop-blur-lg border border-border/70;
     box-shadow: 0 1px 4px 0 hsl(222 24% 10% / 0.07);
   }
 
