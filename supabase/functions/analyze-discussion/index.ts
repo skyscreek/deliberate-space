@@ -107,23 +107,43 @@ Return ONLY valid JSON with this structure (no markdown, no code fences):
 
 ARGDOWN SOURCE RULES:
 The argdown_source field must contain valid Argdown syntax (argdown.org) that reconstructs the argument structure of this discussion.
+Map each post's argument type to proper Argdown elements:
+
+MAPPING RULES for post types → Argdown:
+- "claim" or "proposal" → [Statement Title]: text — a top-level statement in square brackets
+- "support" or "evidence" → + <Argument Title>: text — a supporting argument (+ relation, angle brackets)
+- "objection" or "rebuttal" → - <Argument Title>: text — an attacking argument (- relation, angle brackets)
+- "concern" → - <Concern Title>: text — a weaker attack (- relation)
+- "alternative" → [Alternative Title]: text — a separate competing statement, related with >< (contrary) to the main claim
+- "question" → [Question Title]: text #question — a statement tagged with #question
+
 Use these Argdown conventions:
-- [Statement Title]: Statement text — for statements/claims
-- <Argument Title>: Argument text — for arguments
-- + <Argument> — support relation
-- - <Argument> — attack/objection relation
-- Use #tags for topic clusters (e.g. #equity, #environment)
-- Reference post authors in parentheses after arguments, e.g. <Business Impact>(Marcus Johnson)
-- Keep it concise: summarize each post's core point as a statement or argument
-- Structure the debate hierarchically with the main claim at top
-- Use indentation for nested support/attack relations
+- [Title]: text — for statements (claims, proposals, alternatives, questions)
+- <Title>: text — for arguments (support, objection, evidence, rebuttal, concern)
+- + <Argument> or + [Statement] — support relation (child supports parent)
+- - <Argument> or - [Statement] — attack relation (child attacks parent)
+- >< [Statement] — contrary relation between two competing statements
+- Use #tags for topic clusters (e.g. #equity, #environment, #question)
+- Add post author in parentheses after the title: <Title>(Author): text
+- Use indentation to nest relations hierarchically
+- The main claim/proposal should be at the top level
+- Group related arguments together under the statement they address
+- Include ALL key arguments from every post
 
 Example Argdown:
-[Main Claim]: Congestion pricing should be implemented. #policy
-  + <Evidence From Cities>(Maria): London and Stockholm saw 15-25% traffic reduction.
-    - <Infrastructure Gap>(Sarah): Those cities had better transit before pricing.
-  - <Business Burden>(Tom): Small businesses face $75/day in new delivery costs.
-    + <Consolidation Effect>(Chris): Delivery services adapt by consolidating trips.
+[UBI Proposal]: Universal basic income should be implemented as a pilot program. #policy #economics
+  + <Poverty Reduction>(Maria): Evidence from Finland and Kenya shows UBI reduces poverty by 30%. #evidence
+    - <Cherry-Picked Data>(Tom): Those studies had small sample sizes and short durations.
+      + <Meta-Analysis Support>(Lisa): A 2024 meta-analysis of 47 studies confirms the poverty reduction finding.
+  - <Inflation Risk>(Sarah): Injecting $1000/month per person will drive consumer prices up significantly. #economics
+    + <Controlled Spending>(Chris): Alaska's PFD program shows no significant inflation impact over 40 years.
+  >< [Targeted Welfare]: Means-tested welfare programs are more cost-effective than universal payments. #alternative
+    + <Efficiency Argument>(James): Targeting resources to those most in need maximizes impact per dollar.
+    - <Administrative Overhead>(Maria): Means-testing costs 15-30% of program budgets in bureaucratic overhead.
+  + <Mental Health Benefits>(Alex): Guaranteed income reduces anxiety and depression by removing survival stress. #health
+  - <Work Disincentive>(Robert): People will reduce working hours if given unconditional income. #concern
+    - <Rebuttal from Data>(Lisa): Studies show only a 1-2% reduction in work hours, mostly for education and caregiving.
+  [Open Question]: What is the optimal monthly amount that balances impact with fiscal sustainability? #question
 
 IMPORTANT:
 - Use ONLY real post IDs from the discussion
