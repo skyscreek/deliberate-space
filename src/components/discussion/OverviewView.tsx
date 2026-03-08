@@ -1,30 +1,11 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Topic, ArgumentNode } from '@/types/discussion';
+import { useTopics } from '@/hooks/useTopics';
+import { useTopicRelations } from '@/hooks/useTopicRelations';
+import TopicNetworkGraph from '@/components/graphs/TopicNetworkGraph';
 import { cn } from '@/lib/utils';
-
-/** Renders summary text with inline [linked references](@postId) */
-function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: string) => void }) {
-  const parts = text.split(/(\[[^\]]+\]\(@[^)]+\))/g);
-  return (
-    <p className="text-sm leading-relaxed text-foreground/85">
-      {parts.map((part, i) => {
-        const match = part.match(/^\[([^\]]+)\]\(@([^)]+)\)$/);
-        if (match) {
-          return (
-            <button
-              key={i}
-              onClick={() => onClickRef(match[2])}
-              className="text-primary/80 hover:text-primary underline underline-offset-2 decoration-primary/30 hover:decoration-primary/60 transition-colors"
-            >
-              {match[1]}
-            </button>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </p>
-  );
-}
+import { ExternalLink, MessageSquare, Users, Zap, HelpCircle, Lightbulb, ChevronRight, X, Swords } from 'lucide-react';
 
 interface Props {
   topic: Topic;
@@ -32,76 +13,31 @@ interface Props {
   onSwitchToArgType?: (type: string) => void;
 }
 
-/* Visual cluster bubble */
-function ClusterBubble({ name, description, postCount, isActive, onClick }: {
-  name: string; description: string; postCount: number; isActive: boolean; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'surface-card-elevated px-4 py-3 text-left transition-all hover:border-primary/30',
-        isActive && 'border-primary/30 ring-1 ring-primary/20',
-      )}
-    >
-      <span className="text-sm font-medium text-foreground block">{name}</span>
-      <span className="text-xs text-muted-foreground block mt-0.5 leading-snug">{description}</span>
-      <span className="text-[11px] text-muted-foreground/70 mt-1.5 block">{postCount} posts</span>
-    </button>
-  );
-}
-
-/* Tension visual — two sides */
-function TensionRow({ label, sideA, sideB, postCount, onClick }: {
-  label: string; sideA: string; sideB: string; postCount: number; onClick: () => void;
-}) {
-  return (
-    <button onClick={onClick} className="w-full text-left surface-card-elevated p-4 transition-all hover:border-primary/30">
-      <span className="text-xs font-semibold text-foreground block">{label}</span>
-      <div className="mt-2.5 grid grid-cols-2 gap-2">
-        <div className="rounded-md bg-accent/60 px-2.5 py-2">
-          <span className="text-[10px] text-muted-foreground block mb-0.5 font-medium">Side A</span>
-          <span className="text-xs text-foreground/80 leading-snug block">{sideA.length > 80 ? sideA.slice(0, 80) + '…' : sideA}</span>
-        </div>
-        <div className="rounded-md bg-accent/60 px-2.5 py-2">
-          <span className="text-[10px] text-muted-foreground block mb-0.5 font-medium">Side B</span>
-          <span className="text-xs text-foreground/80 leading-snug block">{sideB.length > 80 ? sideB.slice(0, 80) + '…' : sideB}</span>
-        </div>
-      </div>
-      <span className="text-[11px] text-muted-foreground mt-2 block">{postCount} related posts</span>
-    </button>
-  );
-}
-
-/* Proposal card */
-function ProposalCard({ title, description, supportedBy, onClick }: {
-  title: string; description: string; supportedBy: string[]; onClick: () => void;
-}) {
-  return (
-    <button onClick={onClick} className="w-full text-left surface-card-elevated p-4 border-l-2 border-l-argdown-proposal/40 transition-all hover:border-primary/30">
-      <span className="text-xs font-semibold text-foreground block">{title}</span>
-      <span className="text-xs text-muted-foreground block mt-0.5 leading-snug">{description}</span>
-      {supportedBy.length > 0 && (
-        <span className="text-[11px] text-muted-foreground/70 mt-1.5 block">Supported by {supportedBy.join(', ')}</span>
-      )}
-    </button>
-  );
-}
-
-/* Stats row */
-function StatItem({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="text-center">
-      <span className="text-lg font-bold text-foreground block">{value}</span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-    </div>
-  );
+interface SelectedInfo {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  postCount: number;
+  status: string;
+  cluster: number;
 }
 
 export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgType }: Props) {
-  const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
-  const [highlightedType, setHighlightedType] = useState<string | null>(null);
+  const { data: allTopics } = useTopics();
+  const { data: relations } = useTopicRelations();
+  const [selectedNode, setSelectedNode] = useState<SelectedInfo | null>(null);
+  const navigate = useNavigate();
 
+  const handleSelectNode = useCallback((_id: string | null, data: any) => {
+    setSelectedNode(data);
+  }, []);
+
+  const handleOpenDiscussion = useCallback((slug: string) => {
+    navigate(`/d/${slug}`);
+  }, [navigate]);
+
+  // Arg composition for the mini bar
   const argCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     function walk(n: ArgumentNode) {
@@ -112,150 +48,167 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
     return counts;
   }, [topic.argumentMap]);
 
-  const unresolvedCount = useMemo(() => {
-    let count = 0;
-    function walk(n: ArgumentNode) {
-      if (n.status === 'unresolved') count++;
-      n.children.forEach(walk);
-    }
-    topic.argumentMap.forEach(walk);
-    return count;
-  }, [topic.argumentMap]);
+  const colorMap: Record<string, string> = {
+    claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
+    concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
+    proposal: 'bg-argdown-proposal',
+  };
+
+  const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
+  const hasGraph = allTopics && allTopics.length >= 2;
 
   return (
-    <div className="space-y-4">
-      {/* At-a-glance stats */}
-      <div className="surface-card-elevated px-4 py-3.5">
-        <div className="grid grid-cols-5 gap-2">
-          <StatItem label="Participants" value={topic.participantCount} />
-          <StatItem label="Posts" value={topic.postCount} />
-          <StatItem label="Tensions" value={topic.tensions.length} />
-          <StatItem label="Open Qs" value={topic.openQuestions.length} />
-          <StatItem label="Unresolved" value={unresolvedCount} />
-        </div>
-      </div>
+    <div className="space-y-0">
+      {/* Graph as primary element */}
+      {hasGraph ? (
+        <div className="relative" style={{ height: '520px' }}>
+          <TopicNetworkGraph
+            topics={allTopics!}
+            relations={relations ?? []}
+            fullHeight
+            onSelectNode={handleSelectNode}
+            onOpenDiscussion={handleOpenDiscussion}
+          />
 
-      {/* Argument composition — moved up */}
-      <div className="surface-card-elevated p-4">
-        <h3 className="text-xs font-semibold text-foreground mb-2.5">Argument Composition</h3>
-        {(() => {
-          const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
-          const colorMap: Record<string, string> = {
-            claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
-            concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
-            proposal: 'bg-argdown-proposal',
-          };
-          return (
-            <>
-              <div className="flex gap-0.5 h-3 rounded-full overflow-hidden">
-                {Object.entries(argCounts).map(([type, count]) => (
-                  <button
-                    key={type}
-                    className={cn(
-                      'h-full transition-all duration-200 cursor-pointer',
-                      colorMap[type] || 'bg-muted',
-                      highlightedType && highlightedType !== type && 'opacity-25',
-                    )}
-                    style={{ width: `${(count / total) * 100}%` }}
-                    title={`${type}: ${count}`}
-                    onClick={() => {
-                      setHighlightedType(highlightedType === type ? null : type);
-                      if (highlightedType !== type) onSwitchToArgType?.(type);
-                    }}
-                  />
-                ))}
+          {/* Context panel overlay — right side */}
+          {selectedNode && (
+            <div className="absolute right-0 top-0 bottom-0 w-72 bg-card/95 backdrop-blur-md border-l border-border overflow-y-auto z-20 shadow-lg">
+              <div className="p-4 space-y-4">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-foreground leading-snug">{selectedNode.title}</h3>
+                  <button onClick={() => setSelectedNode(null)} className="text-muted-foreground hover:text-foreground p-0.5 shrink-0">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className="px-1.5 py-0.5 rounded-full border border-border text-primary font-medium">{selectedNode.category}</span>
+                  <span className="text-muted-foreground">{selectedNode.postCount} posts</span>
+                </div>
+                <button
+                  onClick={() => handleOpenDiscussion(selectedNode.slug)}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Open Discussion <ExternalLink className="h-3 w-3" />
+                </button>
               </div>
-              <div className="flex gap-0.5 mt-1.5">
-                {Object.entries(argCounts).map(([type, count]) => (
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="surface-card-elevated p-8 text-center rounded-t-lg">
+          <p className="text-sm text-muted-foreground">Create more topics to see the discourse network graph.</p>
+        </div>
+      )}
+
+      {/* Compact info strip below graph */}
+      <div className="bg-card border border-border border-t-0 rounded-b-lg px-4 py-3 space-y-3">
+        {/* Stats row */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><Users className="h-3 w-3" />{topic.participantCount} participants</span>
+          <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{topic.postCount} posts</span>
+          <span className="flex items-center gap-1"><Swords className="h-3 w-3" />{topic.tensions.length} tensions</span>
+          <span className="flex items-center gap-1"><HelpCircle className="h-3 w-3" />{topic.openQuestions.length} open questions</span>
+        </div>
+
+        {/* Argument composition mini bar */}
+        {total > 0 && (
+          <div>
+            <div className="flex gap-0.5 h-2 rounded-full overflow-hidden">
+              {Object.entries(argCounts).map(([type, count]) => (
+                <button
+                  key={type}
+                  className={cn('h-full transition-all cursor-pointer hover:opacity-80', colorMap[type] || 'bg-muted')}
+                  style={{ width: `${(count / total) * 100}%` }}
+                  title={`${type}: ${count}`}
+                  onClick={() => onSwitchToArgType?.(type)}
+                />
+              ))}
+            </div>
+            <div className="flex gap-2 mt-1">
+              {Object.entries(argCounts).map(([type, count]) => (
+                <button
+                  key={type}
+                  onClick={() => onSwitchToArgType?.(type)}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors capitalize"
+                >
+                  <span className={cn('inline-block w-1.5 h-1.5 rounded-full shrink-0', colorMap[type] || 'bg-muted')} />
+                  {type} {count}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tensions + Questions in compact horizontal layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Key tensions */}
+          {topic.tensions.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <Zap className="h-3 w-3 text-argdown-concern" /> Key Tensions
+              </h4>
+              <div className="space-y-1.5">
+                {topic.tensions.slice(0, 3).map(t => (
                   <button
-                    key={type}
-                    onClick={() => {
-                      setHighlightedType(highlightedType === type ? null : type);
-                      if (highlightedType !== type) onSwitchToArgType?.(type);
-                    }}
-                    style={{ width: `${(count / total) * 100}%` }}
-                    className={cn(
-                      'flex items-center justify-center gap-1 text-[10px] capitalize transition-all duration-150 truncate',
-                      highlightedType === type
-                        ? 'text-foreground font-medium'
-                        : highlightedType
-                          ? 'text-muted-foreground/40'
-                          : 'text-muted-foreground hover:text-foreground',
-                    )}
+                    key={t.id}
+                    onClick={() => t.relatedPostIds[0] && onSwitchToThread?.(t.relatedPostIds[0])}
+                    className="w-full text-left text-xs text-foreground/80 hover:text-foreground transition-colors flex items-center gap-1.5 group"
                   >
-                    <span className={cn('inline-block w-1.5 h-1.5 rounded-full shrink-0', colorMap[type] || 'bg-muted')} />
-                    <span className="truncate">{type} {count}</span>
+                    <span className="w-1 h-1 rounded-full bg-argdown-concern shrink-0" />
+                    <span className="truncate flex-1">{t.sideA}</span>
+                    <span className="text-[9px] text-argdown-concern font-bold shrink-0">vs</span>
+                    <span className="truncate flex-1">{t.sideB}</span>
+                    <ChevronRight className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground shrink-0 transition-colors" />
                   </button>
                 ))}
               </div>
-            </>
-          );
-        })()}
-      </div>
+            </div>
+          )}
 
-      {/* Summary */}
-      <div className="surface-card-elevated p-4">
-        <SummaryText text={topic.summary.text} onClickRef={(postId) => onSwitchToThread?.(postId)} />
-      </div>
-
-      {/* Topic clusters */}
-      <div>
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Topic Clusters</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {topic.clusters.map((c) => (
-            <ClusterBubble
-              key={c.id}
-              name={c.name}
-              description={c.description}
-              postCount={c.postCount}
-              isActive={selectedCluster === c.id}
-              onClick={() => {
-                setSelectedCluster(selectedCluster === c.id ? null : c.id);
-                if (c.relatedPostIds[0] && onSwitchToThread) onSwitchToThread(c.relatedPostIds[0]);
-              }}
-            />
-          ))}
+          {/* Open questions */}
+          {topic.openQuestions.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <HelpCircle className="h-3 w-3 text-argdown-question" /> Open Questions
+              </h4>
+              <div className="space-y-1.5">
+                {topic.openQuestions.slice(0, 3).map(q => (
+                  <button
+                    key={q.id}
+                    onClick={() => onSwitchToThread?.(q.raisedInPostId)}
+                    className="w-full text-left text-xs text-foreground/80 hover:text-foreground transition-colors flex items-center gap-1.5 group"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-argdown-question shrink-0" />
+                    <span className="truncate flex-1">{q.question}</span>
+                    <ChevronRight className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground shrink-0 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Tensions */}
-      <div>
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Key Tensions</h3>
-        <div className="space-y-3">
-          {topic.tensions.map((t) => (
-            <TensionRow
-              key={t.id}
-              label={t.label}
-              sideA={t.sideA}
-              sideB={t.sideB}
-              postCount={t.relatedPostIds.length}
-              onClick={() => {
-                if (t.relatedPostIds[0] && onSwitchToThread) onSwitchToThread(t.relatedPostIds[0]);
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Emerging Proposals */}
-      {topic.emergingProposals.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Emerging Proposals</h3>
-          <div className="space-y-3">
-            {topic.emergingProposals.map((ep) => (
-              <ProposalCard
-                key={ep.id}
-                title={ep.title}
-                description={ep.description}
-                supportedBy={ep.supportedBy}
-                onClick={() => {
-                  if (ep.relatedPostIds[0] && onSwitchToThread) onSwitchToThread(ep.relatedPostIds[0]);
-                }}
-              />
-            ))}
+        {/* Emerging proposals */}
+        {topic.emergingProposals.length > 0 && (
+          <div>
+            <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Lightbulb className="h-3 w-3 text-argdown-proposal" /> Emerging Proposals
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {topic.emergingProposals.map(ep => (
+                <button
+                  key={ep.id}
+                  onClick={() => ep.relatedPostIds[0] && onSwitchToThread?.(ep.relatedPostIds[0])}
+                  className="text-xs px-2.5 py-1.5 rounded-md border border-argdown-proposal/20 bg-argdown-proposal/5 text-foreground hover:border-argdown-proposal/40 transition-colors"
+                >
+                  <Lightbulb className="h-3 w-3 text-argdown-proposal inline mr-1" />
+                  {ep.title}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -1,517 +1,593 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY,
-  SimulationNodeDatum, SimulationLinkDatum,
-} from 'd3-force';
+import Graph from 'graphology';
+import Sigma from 'sigma';
+import forceAtlas2 from 'graphology-layout-forceatlas2';
+import { circular } from 'graphology-layout';
+import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { Network, Maximize2, Minimize2, Search, X, ChevronRight, ExternalLink, Lightbulb } from 'lucide-react';
 
-/* ── Cluster colours ── */
-const CLUSTER_COLORS_HSL: [number, number, number][] = [
-  [340, 70, 55], [160, 60, 45], [45, 80, 55],
-  [270, 55, 58], [195, 70, 50], [15, 75, 55],
+/* ── Cluster colours from design tokens ── */
+const CLUSTER_PALETTE = [
+  'hsl(340, 70%, 55%)', 'hsl(160, 60%, 45%)', 'hsl(45, 80%, 55%)',
+  'hsl(270, 55%, 58%)', 'hsl(195, 70%, 50%)', 'hsl(15, 75%, 55%)',
+  'hsl(200, 60%, 50%)', 'hsl(320, 50%, 50%)',
 ];
-const CLUSTER_COLORS = CLUSTER_COLORS_HSL.map(([h, s, l]) => `hsl(${h}, ${s}%, ${l}%)`);
 
-function hslStr(idx: number, alpha = 1) {
-  const [h, s, l] = CLUSTER_COLORS_HSL[idx % CLUSTER_COLORS_HSL.length];
-  return alpha < 1 ? `hsla(${h}, ${s}%, ${l}%, ${alpha})` : `hsl(${h}, ${s}%, ${l}%)`;
-}
-
-/* ── Types ── */
-interface GraphNode extends SimulationNodeDatum {
-  id: string; slug: string; title: string; category: string;
-  postCount: number; status: string; cluster: number; importance: number;
-}
-interface GraphLink extends SimulationLinkDatum<GraphNode> {
-  id: string; relationType: string;
-}
-interface Cluster {
-  id: number; label: string; color: string; nodes: GraphNode[];
-  cx: number; cy: number; percentage: number;
-}
-
-/* ── Helpers ── */
-function assignClusters(categories: string[]): Map<string, number> {
+function assignClusterColors(categories: string[]): Map<string, number> {
   const unique = [...new Set(categories)];
   const map = new Map<string, number>();
-  unique.forEach((c, i) => map.set(c, i % CLUSTER_COLORS.length));
+  unique.forEach((c, i) => map.set(c, i % CLUSTER_PALETTE.length));
   return map;
 }
 
-function computeImportance(nodeId: string, links: { source: string; target: string }[]): number {
-  let degree = 0;
-  for (const l of links) { if (l.source === nodeId || l.target === nodeId) degree++; }
-  return degree;
+function hexFromHsl(hslStr: string): string {
+  const m = hslStr.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+  if (!m) return '#888888';
+  const h = parseInt(m[1]) / 360;
+  const s = parseInt(m[2]) / 100;
+  const l = parseInt(m[3]) / 100;
+  let r: number, g: number, b: number;
+  if (s === 0) { r = g = b = l; } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  const toHex = (x: number) => {
+    const hex = Math.round(x * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/* ── Types ── */
+interface NodeData {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  postCount: number;
+  status: string;
+  cluster: number;
+}
+
+interface ClusterInfo {
+  id: number;
+  label: string;
+  color: string;
+  nodeCount: number;
+  totalPosts: number;
+}
+
+interface GapInfo {
+  a: ClusterInfo;
+  b: ClusterInfo;
+  linkCount: number;
 }
 
 /* ── Main component ── */
-interface Props { topics: TopicRow[]; relations: TopicRelation[]; }
+interface Props {
+  topics: TopicRow[];
+  relations: TopicRelation[];
+  /** When in full overview mode, fill parent */
+  fullHeight?: boolean;
+  /** Called when user selects a node */
+  onSelectNode?: (nodeId: string | null, nodeData: NodeData | null) => void;
+  /** Called when user wants to open a discussion */
+  onOpenDiscussion?: (slug: string) => void;
+}
 
-export default function TopicNetworkGraph({ topics, relations }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export default function TopicNetworkGraph({ topics, relations, fullHeight, onSelectNode, onOpenDiscussion }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes] = useState<GraphNode[]>([]);
-  const [links, setLinks] = useState<GraphLink[]>([]);
+  const sigmaRef = useRef<Sigma | null>(null);
+  const graphRef = useRef<Graph | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [topicsOpen, setTopicsOpen] = useState(true);
-  const [gapsOpen, setGapsOpen] = useState(true);
-  const [statsOpen, setStatsOpen] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 480 });
-  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  const dragRef = useRef<{ dragging: boolean; nodeId: string | null; startX: number; startY: number; panStartX: number; panStartY: number }>({
-    dragging: false, nodeId: null, startX: 0, startY: 0, panStartX: 0, panStartY: 0,
-  });
-  const simRef = useRef<ReturnType<typeof forceSimulation<GraphNode>> | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
 
-  const clusterMap = useMemo(() => assignClusters(topics.map(t => t.category)), [topics]);
+  const clusterMap = useMemo(() => assignClusterColors(topics.map(t => t.category)), [topics]);
 
-  // Resize observer
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      if (width > 0 && height > 0) setDimensions({ width, height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Build simulation
-  useEffect(() => {
-    if (topics.length === 0) return;
-    const rawLinks = relations.map(r => ({ source: r.source_topic_id, target: r.target_topic_id }));
-    const graphNodes: GraphNode[] = topics.map(t => {
-      const imp = computeImportance(t.id, rawLinks);
-      return {
-        id: t.id, slug: t.slug, title: t.title, category: t.category,
-        postCount: t.post_count || 0, status: t.status,
-        cluster: clusterMap.get(t.category) ?? 0, importance: imp,
-      };
-    });
-    const nodeIds = new Set(graphNodes.map(n => n.id));
-    const graphLinks: GraphLink[] = relations
-      .filter(r => nodeIds.has(r.source_topic_id) && nodeIds.has(r.target_topic_id))
-      .map(r => ({ id: r.id, source: r.source_topic_id, target: r.target_topic_id, relationType: r.relation_type }));
-
-    const sim = forceSimulation<GraphNode>(graphNodes)
-      .force('link', forceLink<GraphNode, GraphLink>(graphLinks).id(d => d.id).distance(120).strength(0.5))
-      .force('charge', forceManyBody().strength(-400))
-      .force('center', forceCenter(0, 0))
-      .force('collide', forceCollide<GraphNode>().radius(d => 20 + (d.postCount || 0) * 3 + d.importance * 4))
-      .force('x', forceX(0).strength(0.03))
-      .force('y', forceY(0).strength(0.03))
-      .alphaDecay(0.012)
-      .on('tick', () => { setNodes([...graphNodes]); setLinks([...graphLinks]); });
-
-    simRef.current = sim;
-    return () => { sim.stop(); };
-  }, [topics, relations, clusterMap]);
-
-  // Node radius helper
-  const getRadius = useCallback((n: GraphNode) => {
-    return Math.max(8, Math.min(40, 8 + n.postCount * 3 + n.importance * 5));
-  }, []);
-
-  // Find node at position
-  const findNodeAt = useCallback((cx: number, cy: number) => {
-    const { x: tx, y: ty, k } = transform;
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      const n = nodes[i];
-      const sx = (n.x ?? 0) * k + tx + dimensions.width / 2;
-      const sy = (n.y ?? 0) * k + ty + dimensions.height / 2;
-      const r = getRadius(n) * k;
-      const dx = cx - sx, dy = cy - sy;
-      if (dx * dx + dy * dy <= r * r) return n;
+  // Build clusters info
+  const clusters = useMemo<ClusterInfo[]>(() => {
+    const groups = new Map<number, { label: string; count: number; posts: number }>();
+    for (const t of topics) {
+      const c = clusterMap.get(t.category) ?? 0;
+      if (!groups.has(c)) groups.set(c, { label: t.category, count: 0, posts: 0 });
+      const g = groups.get(c)!;
+      g.count++;
+      g.posts += t.post_count || 0;
     }
-    return null;
-  }, [nodes, transform, dimensions, getRadius]);
+    return Array.from(groups.entries()).map(([id, g]) => ({
+      id, label: g.label, color: CLUSTER_PALETTE[id % CLUSTER_PALETTE.length],
+      nodeCount: g.count, totalPosts: g.posts,
+    })).sort((a, b) => b.totalPosts - a.totalPosts);
+  }, [topics, clusterMap]);
 
-  // Connected set for hover highlight
-  const connectedToHovered = useMemo(() => {
-    if (!hoveredNode) return new Set<string>();
-    const s = new Set<string>([hoveredNode]);
-    for (const l of links) {
-      const src = typeof l.source === 'object' ? (l.source as GraphNode).id : String(l.source);
-      const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : String(l.target);
-      if (src === hoveredNode) s.add(tgt);
-      if (tgt === hoveredNode) s.add(src);
-    }
-    return s;
-  }, [hoveredNode, links]);
-
-  // Draw
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = dimensions.width * dpr;
-    canvas.height = dimensions.height * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const { width: W, height: H } = dimensions;
-    const { x: tx, y: ty, k } = transform;
-
-    // Background
-    ctx.fillStyle = 'hsl(220, 14%, 96%)';
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle grid
-    ctx.strokeStyle = 'hsla(220, 10%, 85%, 0.4)';
-    ctx.lineWidth = 0.5;
-    const gridSize = 60 * k;
-    const offX = (tx + W / 2) % gridSize;
-    const offY = (ty + H / 2) % gridSize;
-    for (let x = offX; x < W; x += gridSize) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = offY; y < H; y += gridSize) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-    ctx.save();
-    ctx.translate(W / 2 + tx, H / 2 + ty);
-    ctx.scale(k, k);
-
-    // Draw edges
-    for (const l of links) {
-      const src = l.source as GraphNode;
-      const tgt = l.target as GraphNode;
-      const sameCluster = src.cluster === tgt.cluster;
-      const isHighlighted = hoveredNode
-        ? connectedToHovered.has(src.id) && connectedToHovered.has(tgt.id)
-        : false;
-      const isDimmed = hoveredNode ? !isHighlighted : false;
-
-      ctx.beginPath();
-      ctx.moveTo(src.x ?? 0, src.y ?? 0);
-      ctx.lineTo(tgt.x ?? 0, tgt.y ?? 0);
-      ctx.lineWidth = isHighlighted ? 3 : sameCluster ? 2 : 1.5;
-      ctx.strokeStyle = isDimmed
-        ? 'hsla(220, 10%, 70%, 0.1)'
-        : isHighlighted
-          ? hslStr(src.cluster, 0.8)
-          : sameCluster
-            ? hslStr(src.cluster, 0.3)
-            : 'hsla(220, 10%, 60%, 0.25)';
-      ctx.stroke();
-    }
-
-    // Draw nodes
-    for (const n of nodes) {
-      const r = getRadius(n);
-      const nx = n.x ?? 0, ny = n.y ?? 0;
-      const isDimmed = hoveredNode ? !connectedToHovered.has(n.id) : false;
-      const isHov = hoveredNode === n.id;
-      const isSel = selectedNode === n.id;
-
-      // Glow for hovered/selected
-      if (isHov || isSel) {
-        const grad = ctx.createRadialGradient(nx, ny, r * 0.5, nx, ny, r * 2.5);
-        grad.addColorStop(0, hslStr(n.cluster, 0.3));
-        grad.addColorStop(1, 'hsla(0,0%,0%,0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(nx, ny, r * 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Node circle
-      ctx.beginPath();
-      ctx.arc(nx, ny, r, 0, Math.PI * 2);
-      const alpha = isDimmed ? 0.12 : isHov ? 1 : 0.85;
-      ctx.fillStyle = hslStr(n.cluster, alpha);
-      ctx.fill();
-
-      // Border
-      if (isSel) {
-        ctx.strokeStyle = 'hsl(var(--foreground))';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      } else if (isHov) {
-        ctx.strokeStyle = hslStr(n.cluster, 1);
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-
-      // Label
-      if (!isDimmed || isHov || isSel) {
-        const label = n.title.length > 24 ? n.title.slice(0, 22) + '…' : n.title;
-        const fontSize = isHov ? 13 : isSel ? 12 : Math.max(9, Math.min(12, r * 0.6));
-        ctx.font = `${isHov || isSel ? '600' : '500'} ${fontSize}px system-ui, -apple-system, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Text background for readability
-        const metrics = ctx.measureText(label);
-        const tw = metrics.width + 8;
-        const th = fontSize + 6;
-        ctx.fillStyle = 'hsla(220, 14%, 96%, 0.85)';
-        ctx.beginPath();
-        ctx.roundRect(nx - tw / 2, ny + r + 4, tw, th, 3);
-        ctx.fill();
-
-        ctx.fillStyle = isDimmed ? 'hsla(220, 10%, 50%, 0.4)' : 'hsl(220, 15%, 20%)';
-        ctx.fillText(label, nx, ny + r + 4 + th / 2);
-      }
-    }
-
-    ctx.restore();
-  }, [nodes, links, dimensions, transform, hoveredNode, selectedNode, connectedToHovered, getRadius]);
-
-  // Mouse interactions
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const d = dragRef.current;
-
-    if (d.dragging && d.nodeId) {
-      // Drag node
-      const n = nodes.find(nd => nd.id === d.nodeId);
-      if (n && simRef.current) {
-        n.fx = (cx - dimensions.width / 2 - transform.x) / transform.k;
-        n.fy = (cy - dimensions.height / 2 - transform.y) / transform.k;
-        simRef.current.alpha(0.3).restart();
-      }
-      return;
-    }
-    if (d.dragging && !d.nodeId) {
-      // Pan
-      setTransform(t => ({ ...t, x: t.x + (cx - d.startX), y: t.y + (cy - d.startY) }));
-      d.startX = cx; d.startY = cy;
-      return;
-    }
-
-    const node = findNodeAt(cx, cy);
-    setHoveredNode(node ? node.id : null);
-    if (canvasRef.current) canvasRef.current.style.cursor = node ? 'pointer' : 'grab';
-  }, [nodes, findNodeAt, dimensions, transform]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const node = findNodeAt(cx, cy);
-    dragRef.current = { dragging: true, nodeId: node?.id ?? null, startX: cx, startY: cy, panStartX: cx, panStartY: cy };
-  }, [findNodeAt]);
-
-  const handleMouseUp = useCallback(() => {
-    const d = dragRef.current;
-    if (d.nodeId) {
-      const n = nodes.find(nd => nd.id === d.nodeId);
-      if (n) { n.fx = null; n.fy = null; }
-    }
-    d.dragging = false; d.nodeId = null;
-  }, [nodes]);
-
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const node = findNodeAt(cx, cy);
-    if (node) setSelectedNode(prev => prev === node.id ? null : node.id);
-    else setSelectedNode(null);
-  }, [findNodeAt]);
-
-  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const node = findNodeAt(cx, cy);
-    if (node) navigate(`/d/${node.slug}`);
-  }, [findNodeAt, navigate]);
-
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
-    setTransform(t => {
-      const newK = Math.max(0.2, Math.min(4, t.k * factor));
-      const mx = cx - dimensions.width / 2, my = cy - dimensions.height / 2;
-      return {
-        k: newK,
-        x: mx - (mx - t.x) * (newK / t.k),
-        y: my - (my - t.y) * (newK / t.k),
-      };
-    });
-  }, [dimensions]);
-
-  // Clusters & gaps
-  const clusters = useMemo<Cluster[]>(() => {
-    if (nodes.length === 0) return [];
-    const groups = new Map<number, GraphNode[]>();
-    for (const n of nodes) { if (!groups.has(n.cluster)) groups.set(n.cluster, []); groups.get(n.cluster)!.push(n); }
-    const totalPosts = nodes.reduce((s, n) => s + n.postCount, 0) || 1;
-    return Array.from(groups.entries()).map(([id, clusterNodes]) => ({
-      id, label: clusterNodes[0].category, color: CLUSTER_COLORS[id % CLUSTER_COLORS.length],
-      nodes: clusterNodes,
-      cx: clusterNodes.reduce((s, n) => s + (n.x ?? 0), 0) / clusterNodes.length,
-      cy: clusterNodes.reduce((s, n) => s + (n.y ?? 0), 0) / clusterNodes.length,
-      percentage: Math.round((clusterNodes.reduce((s, n) => s + n.postCount, 0) / totalPosts) * 100),
-    })).sort((a, b) => b.percentage - a.percentage);
-  }, [nodes]);
-
-  const gaps = useMemo(() => {
+  // Build gaps
+  const gaps = useMemo<GapInfo[]>(() => {
     if (clusters.length < 2) return [];
+    const clusterById = new Map(clusters.map(c => [c.id, c]));
+    const topicCluster = new Map(topics.map(t => [t.id, clusterMap.get(t.category) ?? 0]));
     const interLinks = new Map<string, number>();
-    for (const l of links) {
-      const src = typeof l.source === 'object' ? (l.source as GraphNode).cluster : -1;
-      const tgt = typeof l.target === 'object' ? (l.target as GraphNode).cluster : -1;
-      if (src !== tgt && src >= 0 && tgt >= 0) {
+
+    for (const r of relations) {
+      const src = topicCluster.get(r.source_topic_id);
+      const tgt = topicCluster.get(r.target_topic_id);
+      if (src !== undefined && tgt !== undefined && src !== tgt) {
         const key = [Math.min(src, tgt), Math.max(src, tgt)].join('-');
         interLinks.set(key, (interLinks.get(key) ?? 0) + 1);
       }
     }
-    const gapPairs: { a: Cluster; b: Cluster; count: number }[] = [];
+
+    const result: GapInfo[] = [];
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
         const key = [Math.min(clusters[i].id, clusters[j].id), Math.max(clusters[i].id, clusters[j].id)].join('-');
         const count = interLinks.get(key) ?? 0;
-        if (count <= 1) gapPairs.push({ a: clusters[i], b: clusters[j], count });
+        if (count <= 1) {
+          result.push({
+            a: clusterById.get(clusters[i].id)!,
+            b: clusterById.get(clusters[j].id)!,
+            linkCount: count,
+          });
+        }
       }
     }
-    return gapPairs.sort((a, b) => a.count - b.count).slice(0, 3);
-  }, [clusters, links]);
+    return result.sort((a, b) => a.linkCount - b.linkCount).slice(0, 4);
+  }, [clusters, topics, relations, clusterMap]);
 
-  const selectedNodeData = useMemo(() => nodes.find(n => n.id === selectedNode), [nodes, selectedNode]);
-  const handleSelect = useCallback((id: string) => setSelectedNode(prev => prev === id ? null : id), []);
+  // Selected node data
+  const selectedNodeData = useMemo<NodeData | null>(() => {
+    if (!selectedNode) return null;
+    const t = topics.find(t => t.id === selectedNode);
+    if (!t) return null;
+    return {
+      id: t.id, slug: t.slug, title: t.title, category: t.category,
+      postCount: t.post_count || 0, status: t.status, cluster: clusterMap.get(t.category) ?? 0,
+    };
+  }, [selectedNode, topics, clusterMap]);
+
+  // Search filtered nodes
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return topics.filter(t => t.title.toLowerCase().includes(q)).slice(0, 8);
+  }, [searchQuery, topics]);
+
+  // Build graph and sigma
+  useEffect(() => {
+    if (!containerRef.current || topics.length === 0) return;
+
+    const graph = new Graph();
+    graphRef.current = graph;
+
+    // Add nodes
+    for (const t of topics) {
+      const cluster = clusterMap.get(t.category) ?? 0;
+      graph.addNode(t.id, {
+        label: t.title,
+        size: Math.max(4, Math.min(25, 4 + (t.post_count || 0) * 1.5)),
+        color: hexFromHsl(CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length]),
+        // Store extra data
+        slug: t.slug,
+        category: t.category,
+        postCount: t.post_count || 0,
+        status: t.status,
+        cluster,
+      });
+    }
+
+    // Add edges
+    const nodeIds = new Set(topics.map(t => t.id));
+    for (const r of relations) {
+      if (nodeIds.has(r.source_topic_id) && nodeIds.has(r.target_topic_id)) {
+        const srcCluster = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
+        const tgtCluster = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
+        const sameCluster = srcCluster === tgtCluster;
+        
+        try {
+          graph.addEdge(r.source_topic_id, r.target_topic_id, {
+            size: sameCluster ? 2 : 1,
+            color: sameCluster
+              ? hexFromHsl(CLUSTER_PALETTE[srcCluster % CLUSTER_PALETTE.length]) + '66'
+              : '#88888833',
+            type: 'line',
+          });
+        } catch {
+          // Edge may already exist
+        }
+      }
+    }
+
+    // Apply circular layout first, then ForceAtlas2
+    circular.assign(graph, { scale: 100 });
+
+    // Compute degree centrality for sizing
+    try {
+      const centralities = degreeCentrality(graph);
+      graph.forEachNode((node) => {
+        const currentSize = graph.getNodeAttribute(node, 'size') as number;
+        const centrality = centralities[node] || 0;
+        graph.setNodeAttribute(node, 'size', Math.max(4, currentSize + centrality * 20));
+      });
+    } catch {
+      // metrics may fail on disconnected graphs
+    }
+
+    // Run ForceAtlas2
+    forceAtlas2.assign(graph, {
+      iterations: 100,
+      settings: {
+        gravity: 1,
+        scalingRatio: 10,
+        barnesHutOptimize: true,
+        barnesHutTheta: 0.5,
+        strongGravityMode: false,
+        slowDown: 5,
+        outboundAttractionDistribution: true,
+      },
+    });
+
+    // Create Sigma
+    const renderer = new Sigma(graph, containerRef.current, {
+      renderEdgeLabels: false,
+      enableEdgeEvents: false,
+      defaultEdgeType: 'line',
+      labelFont: 'Inter, system-ui, -apple-system, sans-serif',
+      labelSize: 12,
+      labelWeight: '500',
+      labelColor: { color: '#374151' },
+      stagePadding: 40,
+      labelRenderedSizeThreshold: 6,
+      nodeProgramClasses: {},
+      defaultNodeColor: '#888',
+      defaultEdgeColor: '#ddd',
+      labelDensity: 0.15,
+      labelGridCellSize: 120,
+      zIndex: true,
+    });
+
+    sigmaRef.current = renderer;
+
+    // Hover reducer: highlight neighbors
+    let currentHovered: string | null = null;
+
+    renderer.on('enterNode', ({ node }) => {
+      currentHovered = node;
+      setHoveredNode(node);
+      renderer.setSetting('nodeReducer', (n, data) => {
+        const res = { ...data };
+        if (n === currentHovered) {
+          res.highlighted = true;
+          res.zIndex = 2;
+        } else if (graph.hasNode(currentHovered!) && graph.areNeighbors(n, currentHovered!)) {
+          res.highlighted = true;
+          res.zIndex = 1;
+        } else {
+          res.color = `${data.color}22`;
+          res.label = '';
+          res.zIndex = 0;
+        }
+        return res;
+      });
+      renderer.setSetting('edgeReducer', (edge, data) => {
+        const res = { ...data };
+        const src = graph.source(edge);
+        const tgt = graph.target(edge);
+        if (src === currentHovered || tgt === currentHovered) {
+          res.size = 3;
+          const srcColor = graph.getNodeAttribute(src === currentHovered ? src : tgt, 'color');
+          res.color = srcColor + 'AA';
+        } else {
+          res.color = '#00000008';
+          res.size = 0.5;
+        }
+        return res;
+      });
+      renderer.refresh();
+    });
+
+    renderer.on('leaveNode', () => {
+      currentHovered = null;
+      setHoveredNode(null);
+      renderer.setSetting('nodeReducer', null);
+      renderer.setSetting('edgeReducer', null);
+      renderer.refresh();
+    });
+
+    // Click to select
+    renderer.on('clickNode', ({ node }) => {
+      setSelectedNode(prev => prev === node ? null : node);
+    });
+
+    // Double-click to navigate
+    renderer.on('doubleClickNode', ({ node, event }) => {
+      event.preventSigmaDefault();
+      const slug = graph.getNodeAttribute(node, 'slug') as string;
+      if (slug) {
+        if (onOpenDiscussion) onOpenDiscussion(slug);
+        else navigate(`/d/${slug}`);
+      }
+    });
+
+    // Click stage to deselect
+    renderer.on('clickStage', () => {
+      setSelectedNode(null);
+    });
+
+    return () => {
+      renderer.kill();
+      sigmaRef.current = null;
+      graphRef.current = null;
+    };
+  }, [topics, relations, clusterMap, navigate, onOpenDiscussion]);
+
+  // Notify parent of selection changes
+  useEffect(() => {
+    onSelectNode?.(selectedNode, selectedNodeData);
+  }, [selectedNode, selectedNodeData, onSelectNode]);
+
+  // Apply selected-node highlighting
+  useEffect(() => {
+    const renderer = sigmaRef.current;
+    const graph = graphRef.current;
+    if (!renderer || !graph) return;
+
+    if (selectedNode && graph.hasNode(selectedNode)) {
+      renderer.setSetting('nodeReducer', (n, data) => {
+        const res = { ...data };
+        if (n === selectedNode) {
+          res.highlighted = true;
+          res.zIndex = 2;
+        } else if (graph.areNeighbors(n, selectedNode)) {
+          res.highlighted = true;
+          res.zIndex = 1;
+        } else {
+          res.color = `${data.color}33`;
+          res.label = '';
+          res.zIndex = 0;
+        }
+        return res;
+      });
+      renderer.setSetting('edgeReducer', (edge, data) => {
+        const res = { ...data };
+        const src = graph.source(edge);
+        const tgt = graph.target(edge);
+        if (src === selectedNode || tgt === selectedNode) {
+          res.size = 3;
+          res.color = graph.getNodeAttribute(selectedNode, 'color') + 'BB';
+        } else {
+          res.color = '#00000008';
+          res.size = 0.5;
+        }
+        return res;
+      });
+    } else {
+      renderer.setSetting('nodeReducer', null);
+      renderer.setSetting('edgeReducer', null);
+    }
+    renderer.refresh();
+  }, [selectedNode]);
+
+  // Camera focus on search result
+  const focusNode = useCallback((nodeId: string) => {
+    const renderer = sigmaRef.current;
+    const graph = graphRef.current;
+    if (!renderer || !graph || !graph.hasNode(nodeId)) return;
+
+    setSelectedNode(nodeId);
+    setSearchOpen(false);
+    setSearchQuery('');
+
+    const pos = graph.getNodeAttributes(nodeId);
+    renderer.getCamera().animate(
+      { x: pos.x as number, y: pos.y as number, ratio: 0.3 },
+      { duration: 400 },
+    );
+  }, []);
+
+  const handleOpen = useCallback((slug: string) => {
+    if (onOpenDiscussion) onOpenDiscussion(slug);
+    else navigate(`/d/${slug}`);
+  }, [navigate, onOpenDiscussion]);
 
   if (topics.length < 2) return null;
 
+  const showSidebar = !fullHeight; // In standalone mode, show built-in sidebar
+
   return (
-    <div className={cn('rounded-xl overflow-hidden border border-border bg-card', expanded && 'fixed inset-4 z-50')}>
+    <div className={cn(
+      'rounded-xl overflow-hidden border border-border bg-card relative',
+      expanded && 'fixed inset-4 z-50',
+      fullHeight && 'h-full border-0 rounded-none',
+    )}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card z-10 relative">
         <div className="flex items-center gap-2">
           <Network className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs font-semibold text-foreground">Discourse Network</span>
-          <span className="text-[10px] text-muted-foreground ml-1">{topics.length} topics · {relations.length} connections</span>
+          <span className="text-[10px] text-muted-foreground ml-1">{topics.length} topics · {relations.length} links</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground mr-1">Drag nodes · Scroll to zoom · Dbl-click to open</span>
-          <button onClick={() => setSidebarOpen(s => !s)} className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors" title={sidebarOpen ? 'Collapse panel' : 'Expand panel'}>
-            {sidebarOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-          </button>
-          <button onClick={() => setExpanded(e => !e)} className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors">
-            {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex" style={{ height: expanded ? 'calc(100% - 40px)' : '480px' }}>
-        {/* Canvas */}
-        <div ref={containerRef} className="flex-1 relative" style={{ minHeight: '400px' }}>
-          <canvas
-            ref={canvasRef}
-            className="w-full h-full"
-            style={{ display: 'block' }}
-            onMouseMove={handleMouseMove}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onClick={handleClick}
-            onDoubleClick={handleDoubleClick}
-            onWheel={handleWheel}
-          />
-          {/* Legend overlay */}
-          <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
-            {clusters.map(c => (
-              <span key={c.id} className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm bg-card/80" style={{ color: c.color, border: `1px solid ${hslStr(c.id, 0.3)}` }}>
-                {c.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className={cn('border-l border-border overflow-y-auto flex-shrink-0 transition-all duration-300 bg-card', sidebarOpen ? 'w-64' : 'w-0 overflow-hidden')}>
-          <div className="p-3 space-y-3 w-64">
-            <div>
-              <button onClick={() => setTopicsOpen(o => !o)} className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors">
-                Main Topics
-                {topicsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </button>
-              {topicsOpen && (
-                <>
-                  <div className="space-y-1.5">
-                    {clusters.map(c => (
-                      <div key={c.id} className="flex items-center gap-2">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: c.color }}>{c.percentage}%: {c.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {clusters.flatMap(c => c.nodes.slice(0, 3)).map(n => (
-                      <button key={n.id} onClick={() => handleSelect(n.id)} className="text-[9px] text-muted-foreground bg-muted hover:bg-accent px-1.5 py-0.5 rounded transition-colors cursor-pointer">
-                        {n.title.length > 20 ? n.title.slice(0, 18) + '…' : n.title}
+          <span className="text-[10px] text-muted-foreground mr-1 hidden sm:inline">Scroll zoom · Drag pan · Click select · Dbl-click open</span>
+          {/* Search */}
+          <div className="relative">
+            <button
+              onClick={() => setSearchOpen(o => !o)}
+              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+            {searchOpen && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                <div className="flex items-center px-3 py-2 border-b border-border gap-2">
+                  <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search topics…"
+                    className="flex-1 text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto">
+                    {searchResults.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => focusNode(t.id)}
+                        className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-accent transition-colors flex items-center gap-2"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: CLUSTER_PALETTE[(clusterMap.get(t.category) ?? 0) % CLUSTER_PALETTE.length] }}
+                        />
+                        <span className="truncate">{t.title}</span>
                       </button>
                     ))}
                   </div>
-                </>
-              )}
-            </div>
-
-            {gaps.length > 0 && (
-              <div>
-                <button onClick={() => setGapsOpen(o => !o)} className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors">
-                  <span className="flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Gaps to Connect</span>
-                  {gapsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
-                {gapsOpen && (
-                  <>
-                    <div className="space-y-2">
-                      {gaps.map((gap, i) => (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white" style={{ background: gap.a.color }}>{gap.a.label}</span>
-                          <span className="text-[10px] text-muted-foreground">↔</span>
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white" style={{ background: gap.b.color }}>{gap.b.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">These topic clusters have few connections. Bridge them with new discussions.</p>
-                  </>
+                )}
+                {searchQuery && searchResults.length === 0 && (
+                  <p className="px-3 py-3 text-xs text-muted-foreground">No topics found</p>
                 )}
               </div>
             )}
+          </div>
+          {!fullHeight && (
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
+            >
+              {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
+      </div>
 
-            {selectedNodeData && (
-              <div className="border-t border-border pt-3">
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Selected</h4>
-                <p className="text-xs text-foreground font-medium">{selectedNodeData.title}</p>
-                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
-                  <span>{selectedNodeData.postCount} posts</span><span>·</span><span>{selectedNodeData.importance} connections</span>
+      <div className="flex" style={{ height: fullHeight ? 'calc(100% - 40px)' : expanded ? 'calc(100% - 40px)' : '500px' }}>
+        {/* Sigma container */}
+        <div ref={containerRef} className="flex-1 relative bg-background" />
+
+        {/* Sidebar — only in standalone mode */}
+        {showSidebar && (
+          <div className="w-60 border-l border-border overflow-y-auto bg-card flex-shrink-0 hidden md:block">
+            <div className="p-3 space-y-4">
+              {/* Clusters */}
+              <div>
+                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Topic Clusters</h4>
+                <div className="space-y-1.5">
+                  {clusters.map(c => (
+                    <div key={c.id} className="flex items-center gap-2 text-xs">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                      <span className="text-foreground font-medium truncate flex-1">{c.label}</span>
+                      <span className="text-muted-foreground text-[10px]">{c.nodeCount}</span>
+                    </div>
+                  ))}
                 </div>
-                <button onClick={() => navigate(`/d/${selectedNodeData.slug}`)} className="mt-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded hover:bg-accent transition-colors" style={{ color: CLUSTER_COLORS[selectedNodeData.cluster % CLUSTER_COLORS.length] }}>
-                  Open discussion <ChevronRight className="h-3 w-3" />
-                </button>
               </div>
-            )}
 
-            <div className="border-t border-border pt-3">
-              <button onClick={() => setStatsOpen(o => !o)} className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors">
-                Stats
-                {statsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </button>
-              {statsOpen && (
-                <div className="grid grid-cols-2 gap-2 text-center mt-1">
-                  <div className="bg-muted rounded p-2"><div className="text-sm font-bold text-foreground">{topics.length}</div><div className="text-[9px] text-muted-foreground">Topics</div></div>
-                  <div className="bg-muted rounded p-2"><div className="text-sm font-bold text-foreground">{relations.length}</div><div className="text-[9px] text-muted-foreground">Connections</div></div>
-                  <div className="bg-muted rounded p-2"><div className="text-sm font-bold text-foreground">{clusters.length}</div><div className="text-[9px] text-muted-foreground">Clusters</div></div>
-                  <div className="bg-muted rounded p-2"><div className="text-sm font-bold text-foreground">{gaps.length}</div><div className="text-[9px] text-muted-foreground">Gaps</div></div>
+              {/* Gaps */}
+              {gaps.length > 0 && (
+                <div>
+                  <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <Lightbulb className="h-3 w-3" /> Gaps
+                  </h4>
+                  <div className="space-y-2">
+                    {gaps.map((gap, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                        <span className="font-medium px-1.5 py-0.5 rounded" style={{ background: gap.a.color + '22', color: gap.a.color }}>{gap.a.label}</span>
+                        <span className="text-muted-foreground">↔</span>
+                        <span className="font-medium px-1.5 py-0.5 rounded" style={{ background: gap.b.color + '22', color: gap.b.color }}>{gap.b.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">
+                    Weakly connected clusters. Bridge with new discussions.
+                  </p>
                 </div>
               )}
+
+              {/* Selected */}
+              {selectedNodeData && (
+                <div className="border-t border-border pt-3">
+                  <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Selected</h4>
+                  <p className="text-xs text-foreground font-medium leading-snug">{selectedNodeData.title}</p>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                    <span className="px-1.5 py-0.5 rounded" style={{
+                      background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '22',
+                      color: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length],
+                    }}>
+                      {selectedNodeData.category}
+                    </span>
+                    <span>{selectedNodeData.postCount} posts</span>
+                  </div>
+                  <button
+                    onClick={() => handleOpen(selectedNodeData.slug)}
+                    className="mt-2 flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Open discussion <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Stats */}
+              <div className="border-t border-border pt-3">
+                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h4>
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="bg-accent rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{topics.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Topics</div>
+                  </div>
+                  <div className="bg-accent rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{relations.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Links</div>
+                  </div>
+                  <div className="bg-accent rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{clusters.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Clusters</div>
+                  </div>
+                  <div className="bg-accent rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{gaps.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Gaps</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Bottom legend */}
+      <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5 z-10">
+        {clusters.map(c => (
+          <span
+            key={c.id}
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm bg-card/80 border"
+            style={{ color: c.color, borderColor: c.color + '44' }}
+          >
+            {c.label}
+          </span>
+        ))}
       </div>
     </div>
   );
