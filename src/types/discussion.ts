@@ -133,6 +133,9 @@ export interface ActiveFilter {
 export interface AssistedComment {
   guidanceId: string;
   targetPostId?: string;
+  replyToPostId?: string;
+  replyToAuthor?: string;
+  replyToExcerpt?: string;
   label: string;
   description: string;
   suggestedArgdownType?: ArgdownType;
