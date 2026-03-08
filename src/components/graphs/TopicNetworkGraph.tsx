@@ -625,7 +625,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       )}
 
       {/* ── Cluster legend — bottom-left fallback ── */}
-      {(gaps.length === 0 || selectedNodeData) && (
+      {true && (
         <div className="absolute bottom-4 left-4 z-10">
           <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
             style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
