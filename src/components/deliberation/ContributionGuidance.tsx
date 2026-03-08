@@ -3,18 +3,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, AlertTriangle, Search, Eye, Lightbulb, MessageSquare, ArrowRightLeft, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 
-const icons = {
+const icons: Record<string, typeof AlertTriangle> = {
   overrepresented: AlertTriangle,
   'evidence-needed': Search,
   'missing-perspective': Eye,
   gap: Lightbulb,
+  'missing-counterargument': MessageSquare,
+  'missing-alternative': ArrowRightLeft,
+  'unresolved-question': HelpCircle,
 };
 
-const colors = {
+const colors: Record<string, string> = {
   overrepresented: 'text-amber-500',
   'evidence-needed': 'text-blue-500',
   'missing-perspective': 'text-purple-500',
   gap: 'text-emerald-500',
+  'missing-counterargument': 'text-destructive',
+  'missing-alternative': 'text-violet-500',
+  'unresolved-question': 'text-amber-500',
 };
 
 export default function ContributionGuidance({ items }: { items: GuidanceItem[] }) {
