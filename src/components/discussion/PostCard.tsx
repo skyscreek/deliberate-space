@@ -239,9 +239,9 @@ export default function PostCard({ post }: { post: Post }) {
     >
       <div className="p-4 sm:p-5">
         {/* Top-level post uses same layout pattern */}
-        <div className="flex gap-0">
+        <div className="flex">
           {/* Left column */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center w-8 shrink-0">
             {collapsed ? (
               <div className="pt-0.5">
                 <CollapseToggle collapsed onClick={() => setCollapsed(false)} />
@@ -249,9 +249,7 @@ export default function PostCard({ post }: { post: Post }) {
             ) : (
               <>
                 <Avatar name={post.author.name} color={post.author.color} />
-                {post.replies.length > 0 && (
-                  <ThreadLine onClick={() => setCollapsed(true)} />
-                )}
+                <ThreadLine onClick={() => setCollapsed(true)} />
               </>
             )}
           </div>
