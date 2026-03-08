@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo, useCallback, forwardRef } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
