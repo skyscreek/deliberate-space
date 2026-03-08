@@ -264,7 +264,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       const sameCluster = srcCluster === tgtCluster;
       const edgeColor = sameCluster
         ? CLUSTER_COLORS[srcCluster % CLUSTER_COLORS.length]
-        : 'hsl(0, 0%, 35%)';
+        : isDark ? 'hsl(0, 0%, 35%)' : 'hsl(0, 0%, 70%)';
 
       const isHighlighted = hoveredNode && connectedToHovered.has(src.id) && connectedToHovered.has(tgt.id);
       const isDimmed = hoveredNode && !isHighlighted;
