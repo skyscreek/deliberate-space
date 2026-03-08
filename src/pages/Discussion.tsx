@@ -16,6 +16,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Users, Clock, ChevronDown as ChevDown } from 'lucide-react';
 import { ArgdownType } from '@/types/discussion';
 import DeliberationPanel from '@/components/deliberation/DeliberationPanel';
+import { useAnalysis, AIAnalysis } from '@/hooks/useAnalysis';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import OverviewView from '@/components/discussion/OverviewView';
+import ArgumentMapView from '@/components/discussion/ArgumentMapView';
+import { Topic, ArgumentNode, Tension, ArgumentCluster, OpenQuestion, GuidanceItem, DiscussionSummaryData, EmergingProposal } from '@/types/discussion';
 
 const argdownColors: Partial<Record<string, string>> = {
   claim: 'text-argdown-claim', support: 'text-argdown-support', objection: 'text-argdown-objection',
@@ -477,10 +482,81 @@ function TopicHeaderLive({ topic }: { topic: { title: string; description: strin
   );
 }
 
+/** Build a mock Topic object from live DB data + AI analysis for Overview/ArgMap views */
+function buildTopicForViews(
+  topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string }; created_at: string },
+  posts: PostRow[] | undefined,
+  analysis: AIAnalysis | null,
+): Topic {
+  const tensions: Tension[] = analysis?.tensions?.map(t => ({
+    id: t.id, label: t.label, sideA: t.sideA, sideB: t.sideB, relatedPostIds: t.relatedPostIds,
+  })) ?? [];
+
+  const clusters: ArgumentCluster[] = analysis?.clusters?.map(c => ({
+    id: c.id, name: c.name, description: c.description, postCount: c.postCount, relatedPostIds: c.relatedPostIds,
+  })) ?? [];
+
+  const openQuestions: OpenQuestion[] = analysis?.open_questions?.map(q => ({
+    id: q.id, question: q.question, raisedInPostId: q.raisedInPostId, raisedBy: q.raisedBy, relatedPostIds: q.relatedPostIds,
+  })) ?? [];
+
+  const guidance: GuidanceItem[] = (analysis?.guidance ?? []).map(g => ({
+    id: g.id, type: g.type as GuidanceItem['type'], label: g.label, description: g.description,
+    targetPostId: g.targetPostId, suggestedArgdownType: g.suggestedArgdownType as GuidanceItem['suggestedArgdownType'],
+  }));
+
+  const summary: DiscussionSummaryData = {
+    text: analysis?.summary ?? 'No analysis available yet. Click "Analyze" to generate insights.',
+    positions: [], tensions, openQuestions, emergingProposals: [],
+  };
+
+  // Build argument map from classifications + posts
+  const argumentMap: ArgumentNode[] = [];
+  if (analysis?.classifications && posts) {
+    const postMap = new Map(posts.map(p => [p.id, p]));
+    const rootPosts = posts.filter(p => !p.parent_post_id);
+    
+    function buildNode(post: PostRow, depth: number): ArgumentNode {
+      const classification = analysis!.classifications?.find(c => c.postId === post.id);
+      const nodeType = (classification?.suggestedType || post.argdown_type || 'claim') as ArgumentNode['type'];
+      const validTypes = ['claim', 'support', 'objection', 'concern', 'alternative', 'question', 'proposal'];
+      
+      return {
+        id: `arg-${post.id}`,
+        type: validTypes.includes(nodeType) ? nodeType : 'claim',
+        text: post.content.length > 200 ? post.content.slice(0, 200) + '…' : post.content,
+        author: post.author_profile?.display_name || 'Unknown',
+        relatedPostIds: [post.id],
+        status: 'unresolved',
+        strength: classification?.confidence,
+        children: (post.children || []).map(c => buildNode(c, depth + 1)),
+      };
+    }
+    
+    rootPosts.forEach(p => argumentMap.push(buildNode(p, 0)));
+  }
+
+  const author = { id: topic.author_id, name: topic.author_profile?.display_name || 'Unknown', avatar: '', color: '' };
+  const postCount = posts?.length ?? 0;
+
+  return {
+    id: 'live', title: topic.title, category: topic.category, status: topic.status as Topic['status'],
+    author, createdAt: topic.created_at, lastActivity: topic.created_at,
+    participantCount: new Set(posts?.map(p => p.author_id)).size, postCount,
+    proposal: topic.proposal || topic.description,
+    posts: [], tensions, clusters, openQuestions, guidance, summary,
+    emergingProposals: [], argumentMap,
+  };
+}
+
 function DiscussionContent() {
   const { id } = useParams();
   const { data: topic, isLoading: topicLoading } = useTopic(id);
   const { data: posts, isLoading: postsLoading } = usePosts(id);
+  const { data: analysisData } = useAnalysis(id);
+  const [activeTab, setActiveTab] = useState('discussion');
+  const [argMapFilter, setArgMapFilter] = useState<string | undefined>();
+  const { scrollToPost } = useDiscussion();
 
   if (topicLoading) {
     return (
@@ -498,29 +574,71 @@ function DiscussionContent() {
     );
   }
 
+  const topicForViews = buildTopicForViews(topic, posts, analysisData?.analysis ?? null);
+
   return (
     <div className="space-y-5">
-      <TopicHeaderLive topic={{ ...topic, post_count: posts?.length, participant_count: undefined }} />
+      <TopicHeaderLive topic={{ ...topic, post_count: posts?.length, participant_count: topicForViews.participantCount }} />
       
       <DeliberationPanel topicId={id!} postCount={posts?.length ?? 0} />
-      {postsLoading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {posts?.map(post => (
-            <PostCard key={post.id} post={post} topicId={id!} />
-          ))}
-          {posts?.length === 0 && (
-            <div className="surface-card-elevated p-8 text-center">
-              <p className="text-sm text-muted-foreground">No posts yet. Be the first to contribute!</p>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full">
+          <TabsTrigger value="discussion" className="flex-1">Discussion</TabsTrigger>
+          <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
+          <TabsTrigger value="argument-map" className="flex-1">Argument Map</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="discussion">
+          {postsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {posts?.map(post => (
+                <PostCard key={post.id} post={post} topicId={id!} />
+              ))}
+              {posts?.length === 0 && (
+                <div className="surface-card-elevated p-8 text-center">
+                  <p className="text-sm text-muted-foreground">No posts yet. Be the first to contribute!</p>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+          <TopLevelComposer topicId={id!} />
+        </TabsContent>
 
-      <TopLevelComposer topicId={id!} />
+        <TabsContent value="overview">
+          {!analysisData?.analysis ? (
+            <div className="surface-card-elevated p-8 text-center">
+              <p className="text-sm text-muted-foreground">No analysis available yet. Click "Analyze" above to generate discussion insights.</p>
+            </div>
+          ) : (
+            <OverviewView
+              topic={topicForViews}
+              onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+              onSwitchToArgType={(type) => { setArgMapFilter(type); setActiveTab('argument-map'); }}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="argument-map">
+          {topicForViews.argumentMap.length === 0 ? (
+            <div className="surface-card-elevated p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                {analysisData?.analysis ? 'No argument structure found.' : 'Run an analysis first to generate the argument map.'}
+              </p>
+            </div>
+          ) : (
+            <ArgumentMapView
+              nodes={topicForViews.argumentMap}
+              onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+              initialFilter={argMapFilter}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
