@@ -309,7 +309,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
       // Border for selected
       if (isSelected) {
-        ctx.strokeStyle = 'hsl(0, 0%, 90%)';
+        ctx.strokeStyle = isDark ? 'hsl(0, 0%, 90%)' : 'hsl(0, 0%, 20%)';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -323,7 +323,11 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         ctx.font = `${isHovered ? 700 : 500} ${fontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillStyle = isDimmed ? 'hsla(0, 0%, 85%, 0.15)' : isHovered ? 'hsl(0, 0%, 100%)' : 'hsla(0, 0%, 85%, 0.75)';
+        ctx.fillStyle = isDimmed
+          ? (isDark ? 'hsla(0, 0%, 85%, 0.15)' : 'hsla(0, 0%, 20%, 0.15)')
+          : isHovered
+            ? (isDark ? 'hsl(0, 0%, 100%)' : 'hsl(0, 0%, 0%)')
+            : (isDark ? 'hsla(0, 0%, 85%, 0.75)' : 'hsla(0, 0%, 15%, 0.75)');
         ctx.fillText(
           node.title.length > 30 ? node.title.slice(0, 28) + '…' : node.title,
           node.x,
