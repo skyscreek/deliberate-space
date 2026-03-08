@@ -30,7 +30,7 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
 
       <div className={cn('rounded-md border shadow-sm transition-all', config.bg, config.border)}>
         <div
-          className={cn('flex items-start gap-1.5 px-2.5 py-2', hasChildren && 'cursor-pointer')}
+          className={cn('flex items-start gap-2 px-3 py-2.5', hasChildren && 'cursor-pointer')}
           onClick={() => hasChildren && setExpanded(!expanded)}
         >
           {hasChildren && (
@@ -77,7 +77,7 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
         </div>
 
         {hasChildren && expanded && (
-          <div className="pb-2 px-2 space-y-1.5 border-t border-border/40 pt-1.5 ml-3">
+          <div className="pb-2.5 px-2.5 space-y-2 border-t border-border/40 pt-2 ml-3">
             {node.children.map((child) => (
               <ArgumentNodeCard key={child.id} node={child} depth={depth + 1} switchToThread={switchToThread} />
             ))}
@@ -139,7 +139,7 @@ export default function ArgumentMapView({ nodes, onSwitchToThread }: { nodes: Ar
       </div>
 
       {/* Tree */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filteredNodes.map((node) => (
           <ArgumentNodeCard key={node.id} node={node} depth={0} switchToThread={switchToThread} />
         ))}
