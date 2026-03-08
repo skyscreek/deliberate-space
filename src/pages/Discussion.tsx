@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { Users, Clock, Search, ChevronDown as ChevDown } from 'lucide-react';
 import { ArgdownType } from '@/types/discussion';
+import DeliberationPanel from '@/components/deliberation/DeliberationPanel';
 
 const argdownColors: Partial<Record<string, string>> = {
   claim: 'text-argdown-claim', support: 'text-argdown-support', objection: 'text-argdown-objection',
@@ -361,6 +362,7 @@ function DiscussionContent() {
     <div className="space-y-5">
       <TopicHeaderLive topic={{ ...topic, post_count: posts?.length, participant_count: undefined }} />
       
+      <DeliberationPanel topicId={id!} postCount={posts?.length ?? 0} />
       {postsLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
