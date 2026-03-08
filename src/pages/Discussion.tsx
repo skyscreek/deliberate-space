@@ -38,17 +38,17 @@ export default function Discussion() {
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="glass-strong sticky top-0 z-30 border-b">
-          <div className="mx-auto max-w-3xl px-4 py-2.5 flex items-center gap-3">
+          <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
             <Link to="/" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span className="font-medium text-sm text-foreground">Delibera</span>
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-semibold text-sm text-foreground">Delibera</span>
             </Link>
           </div>
         </header>
 
-        <main className="mx-auto max-w-3xl px-4 py-4 space-y-4">
-          {/* Topic header — compact, collapsible prompt */}
+        <main className="mx-auto max-w-3xl px-4 py-5 space-y-5">
+          {/* Topic header */}
           <TopicHeader topic={topic} />
 
           {/* Discussion insights — only on thread tab */}
@@ -62,7 +62,7 @@ export default function Discussion() {
           )}
 
           {/* View tabs */}
-          <div className="flex items-center gap-0.5 border-b border-border/50">
+          <div className="flex items-center gap-1 border-b border-border">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -70,10 +70,10 @@ export default function Discussion() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 transition-colors -mb-px',
+                    'flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px',
                     activeTab === tab.id
                       ? 'border-primary text-foreground'
-                      : 'border-transparent text-muted-foreground/50 hover:text-foreground hover:border-border/40',
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -85,10 +85,10 @@ export default function Discussion() {
 
           {/* Main content by tab */}
           {activeTab === 'thread' && (
-            <>
+            <div className="space-y-4">
               <ThreadView posts={topic.posts} />
               <ComposerBox guidance={topic.guidance} />
-            </>
+            </div>
           )}
           {activeTab === 'overview' && (
             <OverviewView topic={topic} onSwitchToThread={handleSwitchToThread} />
