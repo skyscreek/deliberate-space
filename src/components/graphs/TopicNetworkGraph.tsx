@@ -9,53 +9,30 @@ import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Search, X, ChevronRight, ExternalLink, Maximize2, Minimize2, MessageSquare } from 'lucide-react';
+import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2 } from 'lucide-react';
 
-/* ── Cluster colours ── */
+/* ── Cluster palette — vivid on dark bg ── */
 const CLUSTER_PALETTE = [
-  'hsl(340, 70%, 55%)', 'hsl(160, 60%, 45%)', 'hsl(45, 80%, 55%)',
-  'hsl(270, 55%, 58%)', 'hsl(195, 70%, 50%)', 'hsl(15, 75%, 55%)',
-  'hsl(200, 60%, 50%)', 'hsl(320, 50%, 50%)',
+  '#e8457a', '#3ec9a0', '#e8b832',
+  '#a065d4', '#3dacd5', '#e07040',
+  '#4a90d9', '#c75a8c',
 ];
-
-function assignClusterColors(categories: string[]): Map<string, number> {
-  const unique = [...new Set(categories)];
-  const map = new Map<string, number>();
-  unique.forEach((c, i) => map.set(c, i % CLUSTER_PALETTE.length));
-  return map;
-}
-
-function hexFromHsl(hslStr: string): string {
-  const m = hslStr.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-  if (!m) return '#888888';
-  const h = parseInt(m[1]) / 360;
-  const s = parseInt(m[2]) / 100;
-  const l = parseInt(m[3]) / 100;
-  let r: number, g: number, b: number;
-  if (s === 0) { r = g = b = l; } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1; if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    const q2 = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q2;
-    r = hue2rgb(p, q2, h + 1/3);
-    g = hue2rgb(p, q2, h);
-    b = hue2rgb(p, q2, h - 1/3);
-  }
-  const toHex = (x: number) => {
-    const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
-  };
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
 
 function hexWithAlpha(hex: string, alpha: number): string {
   const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
   return hex.length === 7 ? hex + a : hex.slice(0, 7) + a;
+}
+
+/* ── Extract short conceptual label from a full title ── */
+function shortLabel(title: string): string {
+  // Remove common filler words and truncate to a concept-level label
+  const cleaned = title
+    .replace(/^(should we|how to|what if|why|the case for|the case against|proposal:|topic:|discussion:)\s*/i, '')
+    .replace(/\?$/, '');
+  const words = cleaned.split(/\s+/);
+  if (words.length <= 3) return cleaned;
+  // Take first 3 meaningful words
+  return words.slice(0, 3).join(' ') + '…';
 }
 
 /* ── Types ── */
@@ -63,6 +40,7 @@ export interface NodeData {
   id: string;
   slug: string;
   title: string;
+  shortLabel: string;
   category: string;
   postCount: number;
   status: string;
@@ -70,15 +48,26 @@ export interface NodeData {
   degree: number;
   neighbors: string[];
   neighborTitles: string[];
+  bridgeScore: number;
+}
+
+export interface GapSuggestion {
+  id: string;
+  clusterA: string;
+  clusterB: string;
+  colorA: string;
+  colorB: string;
+  suggestion: string;
+  bridgeNodes: string[];
 }
 
 interface ClusterInfo {
   id: number;
   label: string;
   color: string;
-  hex: string;
   nodeCount: number;
   totalPosts: number;
+  nodeIds: string[];
 }
 
 /* ── Main component ── */
@@ -100,45 +89,99 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Refs for reducers (avoid stale closures)
   const hoveredRef = useRef<string | null>(null);
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedNode;
 
-  const clusterMap = useMemo(() => assignClusterColors(topics.map(t => t.category)), [topics]);
+  const clusterMap = useMemo(() => {
+    const unique = [...new Set(topics.map(t => t.category))];
+    const map = new Map<string, number>();
+    unique.forEach((c, i) => map.set(c, i % CLUSTER_PALETTE.length));
+    return map;
+  }, [topics]);
 
   const clusters = useMemo<ClusterInfo[]>(() => {
-    const groups = new Map<number, { label: string; count: number; posts: number }>();
+    const groups = new Map<number, { label: string; count: number; posts: number; nodeIds: string[] }>();
     for (const t of topics) {
       const c = clusterMap.get(t.category) ?? 0;
-      if (!groups.has(c)) groups.set(c, { label: t.category, count: 0, posts: 0 });
+      if (!groups.has(c)) groups.set(c, { label: t.category, count: 0, posts: 0, nodeIds: [] });
       const g = groups.get(c)!;
       g.count++;
       g.posts += t.post_count || 0;
+      g.nodeIds.push(t.id);
     }
     return Array.from(groups.entries()).map(([id, g]) => ({
       id, label: g.label,
       color: CLUSTER_PALETTE[id % CLUSTER_PALETTE.length],
-      hex: hexFromHsl(CLUSTER_PALETTE[id % CLUSTER_PALETTE.length]),
-      nodeCount: g.count, totalPosts: g.posts,
+      nodeCount: g.count, totalPosts: g.posts, nodeIds: g.nodeIds,
     })).sort((a, b) => b.totalPosts - a.totalPosts);
   }, [topics, clusterMap]);
 
-  // Build selectedNodeData including neighbors
+  // ── Gap / bridge analysis ──
+  const gaps = useMemo<GapSuggestion[]>(() => {
+    if (clusters.length < 2) return [];
+    const results: GapSuggestion[] = [];
+    // Count cross-cluster edges
+    const crossEdges = new Map<string, number>();
+    const nodeCluster = new Map<string, number>();
+    for (const t of topics) nodeCluster.set(t.id, clusterMap.get(t.category) ?? 0);
+    
+    for (const r of relations) {
+      const cA = nodeCluster.get(r.source_topic_id);
+      const cB = nodeCluster.get(r.target_topic_id);
+      if (cA !== undefined && cB !== undefined && cA !== cB) {
+        const key = [Math.min(cA, cB), Math.max(cA, cB)].join('-');
+        crossEdges.set(key, (crossEdges.get(key) || 0) + 1);
+      }
+    }
+
+    // Find cluster pairs with 0 or very few cross-edges
+    for (let i = 0; i < clusters.length; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        const key = [clusters[i].id, clusters[j].id].sort((a, b) => a - b).join('-');
+        const count = crossEdges.get(key) || 0;
+        if (count <= 1 && clusters[i].nodeCount >= 1 && clusters[j].nodeCount >= 1) {
+          // Find the most connected nodes in each cluster as potential bridges
+          const bridgeA = clusters[i].nodeIds[0];
+          const bridgeB = clusters[j].nodeIds[0];
+          results.push({
+            id: `gap-${key}`,
+            clusterA: clusters[i].label,
+            clusterB: clusters[j].label,
+            colorA: clusters[i].color,
+            colorB: clusters[j].color,
+            suggestion: `How does "${clusters[i].label}" relate to "${clusters[j].label}"?`,
+            bridgeNodes: [bridgeA, bridgeB].filter(Boolean),
+          });
+        }
+      }
+    }
+    return results.slice(0, 4);
+  }, [clusters, relations, topics, clusterMap]);
+
+  const importantNodes = useRef<Set<string>>(new Set());
+  const secondOrderRef = useRef<Set<string>>(new Set());
+
+  // Build selected node data
   const selectedNodeData = useMemo<NodeData | null>(() => {
     if (!selectedNode) return null;
     const t = topics.find(t => t.id === selectedNode);
     const graph = graphRef.current;
     if (!t) return null;
     const neighbors = graph && graph.hasNode(selectedNode) ? graph.neighbors(selectedNode) : [];
-    const neighborTitles = neighbors.map(nid => {
+    const neighborTitles = neighbors.map(nid => topics.find(x => x.id === nid)?.title || '').filter(Boolean);
+    // Bridge score: how many different clusters do neighbors belong to
+    const neighborClusters = new Set(neighbors.map(nid => {
       const nt = topics.find(x => x.id === nid);
-      return nt?.title || '';
-    }).filter(Boolean);
+      return nt ? clusterMap.get(nt.category) : -1;
+    }));
     return {
-      id: t.id, slug: t.slug, title: t.title, category: t.category,
+      id: t.id, slug: t.slug, title: t.title,
+      shortLabel: shortLabel(t.title),
+      category: t.category,
       postCount: t.post_count || 0, status: t.status, cluster: clusterMap.get(t.category) ?? 0,
       degree: neighbors.length, neighbors, neighborTitles,
+      bridgeScore: neighborClusters.size,
     };
   }, [selectedNode, topics, clusterMap]);
 
@@ -148,9 +191,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     return topics.filter(t => t.title.toLowerCase().includes(q)).slice(0, 8);
   }, [searchQuery, topics]);
 
-  // Compute which nodes are "important" — top N by degree
-  const importantNodes = useRef<Set<string>>(new Set());
-
   // ─── Build graph + Sigma ───
   useEffect(() => {
     if (!containerRef.current || topics.length === 0) return;
@@ -158,80 +198,80 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     const graph = new Graph();
     graphRef.current = graph;
 
-    // Add nodes
     for (const t of topics) {
       const cluster = clusterMap.get(t.category) ?? 0;
-      const hex = hexFromHsl(CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length]);
+      const color = CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length];
       graph.addNode(t.id, {
-        label: t.title,
-        size: Math.max(5, Math.min(30, 5 + (t.post_count || 0) * 2)),
-        color: hex,
-        originalColor: hex,
+        label: shortLabel(t.title),
+        fullTitle: t.title,
+        size: Math.max(4, Math.min(24, 4 + (t.post_count || 0) * 1.5)),
+        color,
+        originalColor: color,
         slug: t.slug,
         category: t.category,
         postCount: t.post_count || 0,
         status: t.status,
         cluster,
-        // forceLabel will be set after centrality
         forceLabel: false,
       });
     }
 
-    // Add edges
+    // Add edges — stronger within cluster, thinner across
     const nodeIds = new Set(topics.map(t => t.id));
     for (const r of relations) {
       if (nodeIds.has(r.source_topic_id) && nodeIds.has(r.target_topic_id)) {
         const srcCluster = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
         const tgtCluster = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
         const sameCluster = srcCluster === tgtCluster;
-        const srcHex = hexFromHsl(CLUSTER_PALETTE[srcCluster % CLUSTER_PALETTE.length]);
+        const srcColor = CLUSTER_PALETTE[srcCluster % CLUSTER_PALETTE.length];
         try {
           graph.addEdge(r.source_topic_id, r.target_topic_id, {
-            size: sameCluster ? 1.5 : 0.8,
-            color: sameCluster ? hexWithAlpha(srcHex, 0.35) : '#88888822',
-            originalColor: sameCluster ? hexWithAlpha(srcHex, 0.35) : '#88888822',
+            size: sameCluster ? 2.0 : 1.2,
+            color: sameCluster ? hexWithAlpha(srcColor, 0.45) : hexWithAlpha('#8899aa', 0.25),
+            originalColor: sameCluster ? hexWithAlpha(srcColor, 0.45) : hexWithAlpha('#8899aa', 0.25),
+            originalSize: sameCluster ? 2.0 : 1.2,
             type: 'line',
+            isCrossCluster: !sameCluster,
           });
         } catch { /* edge exists */ }
       }
     }
 
     // Layout
-    circular.assign(graph, { scale: 100 });
+    circular.assign(graph, { scale: 80 });
 
-    // Degree centrality for sizing + importance
+    // Degree centrality
     try {
       const centralities = degreeCentrality(graph);
       const sorted = Object.entries(centralities).sort((a, b) => b[1] - a[1]);
-      const topN = Math.max(3, Math.ceil(topics.length * 0.25));
+      const topN = Math.max(3, Math.ceil(topics.length * 0.3));
       const important = new Set(sorted.slice(0, topN).map(([id]) => id));
       importantNodes.current = important;
 
       graph.forEachNode((node) => {
         const currentSize = graph.getNodeAttribute(node, 'size') as number;
         const centrality = centralities[node] || 0;
-        const newSize = Math.max(5, currentSize + centrality * 25);
-        graph.setNodeAttribute(node, 'size', newSize);
+        graph.setNodeAttribute(node, 'size', Math.max(4, currentSize + centrality * 20));
         graph.setNodeAttribute(node, 'forceLabel', important.has(node));
       });
     } catch { /* ok */ }
 
-    // ForceAtlas2
+    // ForceAtlas2 — tighter clusters
     forceAtlas2.assign(graph, {
-      iterations: 150,
+      iterations: 200,
       settings: {
-        gravity: 1.5,
-        scalingRatio: 12,
+        gravity: 2.5,
+        scalingRatio: 8,
         barnesHutOptimize: true,
         barnesHutTheta: 0.5,
         strongGravityMode: false,
-        slowDown: 8,
+        slowDown: 6,
         outboundAttractionDistribution: true,
         linLogMode: true,
       },
     });
 
-    // ─── Sigma renderer ───
+    // ─── Sigma renderer — dark background ───
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
       enableEdgeEvents: false,
@@ -239,61 +279,71 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       labelFont: "'Inter', system-ui, sans-serif",
       labelSize: 11,
       labelWeight: '500',
-      labelColor: { color: '#555' },
-      stagePadding: 60,
-      // Only show labels for large / important nodes at default zoom
-      labelRenderedSizeThreshold: 10,
-      defaultNodeColor: '#aaa',
-      defaultEdgeColor: '#ddd',
-      // Spread labels out, less overlap
-      labelDensity: 0.08,
-      labelGridCellSize: 180,
+      labelColor: { color: '#d4d8dd' },
+      stagePadding: 50,
+      labelRenderedSizeThreshold: 7,
+      defaultNodeColor: '#667788',
+      defaultEdgeColor: '#334455',
+      labelDensity: 0.12,
+      labelGridCellSize: 150,
       zIndex: true,
-      // Node border for selected
-      nodeReducer: undefined,
-      edgeReducer: undefined,
     });
     sigmaRef.current = renderer;
 
-    // ─── Unified reducer that handles hover + selection ───
+    // ─── Focus+Context reducer ───
     function applyReducers() {
       const hovered = hoveredRef.current;
       const selected = selectedRef.current;
       const focus = hovered || selected;
 
       if (!focus || !graph.hasNode(focus)) {
-        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
-          const res = { ...data };
-          // Only show labels for forceLabel (important) nodes at default zoom
-          if (!graph.getNodeAttribute(node, 'forceLabel')) {
-            // Let sigma's threshold handle it
-          }
-          return res;
-        });
-        renderer.setSetting('edgeReducer', null);
+        // Default state: show all, labels for important only
+        renderer.setSetting('nodeReducer', (_node: string, data: Partial<NodeDisplayData>) => ({ ...data }));
+        renderer.setSetting('edgeReducer', (_edge: string, data: Partial<EdgeDisplayData>) => ({ ...data }));
         renderer.refresh();
         return;
       }
 
-      const neighborSet = new Set(graph.neighbors(focus));
-      neighborSet.add(focus);
+      // 1st order neighbors
+      const neighbors1 = new Set(graph.neighbors(focus));
+      neighbors1.add(focus);
+
+      // 2nd order neighbors
+      const neighbors2 = new Set<string>();
+      for (const n1 of neighbors1) {
+        if (n1 === focus) continue;
+        for (const n2 of graph.neighbors(n1)) {
+          if (!neighbors1.has(n2)) neighbors2.add(n2);
+        }
+      }
+      secondOrderRef.current = neighbors2;
 
       renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
         const res = { ...data };
         if (node === focus) {
+          // Selected: strong highlight, enlarged, forced label with full title
           res.highlighted = true;
           res.zIndex = 10;
           (res as any).forceLabel = true;
-          // Make selected node bigger
-          res.size = ((data.size as number) || 8) * 1.3;
-        } else if (neighborSet.has(node)) {
+          res.label = graph.getNodeAttribute(node, 'fullTitle') as string;
+          res.size = ((data.size as number) || 6) * 1.4;
+          res.color = graph.getNodeAttribute(node, 'originalColor') as string;
+        } else if (neighbors1.has(node)) {
+          // 1st order: highlighted, show short label
           res.highlighted = true;
           res.zIndex = 5;
           (res as any).forceLabel = true;
-        } else {
-          // Fade out non-connected
+          res.color = graph.getNodeAttribute(node, 'originalColor') as string;
+        } else if (neighbors2.has(node)) {
+          // 2nd order: lightly visible
           const origColor = graph.getNodeAttribute(node, 'originalColor') as string;
-          res.color = hexWithAlpha(origColor, 0.08);
+          res.color = hexWithAlpha(origColor, 0.35);
+          res.zIndex = 2;
+          res.label = '';
+        } else {
+          // Rest: dimmed but visible for context
+          const origColor = graph.getNodeAttribute(node, 'originalColor') as string;
+          res.color = hexWithAlpha(origColor, 0.15);
           res.label = '';
           res.zIndex = 0;
         }
@@ -304,14 +354,27 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         const res = { ...data };
         const src = graph.source(edge);
         const tgt = graph.target(edge);
-        if (neighborSet.has(src) && neighborSet.has(tgt) && (src === focus || tgt === focus)) {
-          const focusColor = graph.getNodeAttribute(focus, 'originalColor') as string;
-          res.color = hexWithAlpha(focusColor, 0.7);
-          res.size = 2.5;
+        const focusColor = graph.getNodeAttribute(focus, 'originalColor') as string;
+
+        if ((src === focus || tgt === focus) && neighbors1.has(src) && neighbors1.has(tgt)) {
+          // Direct edges from focus: strong
+          res.color = hexWithAlpha(focusColor, 0.75);
+          res.size = 3;
           res.zIndex = 5;
+        } else if (neighbors1.has(src) && neighbors1.has(tgt)) {
+          // Edges among 1st-order neighbors
+          res.color = hexWithAlpha(focusColor, 0.3);
+          res.size = 1.5;
+          res.zIndex = 3;
+        } else if ((neighbors1.has(src) || neighbors1.has(tgt)) && (neighbors2.has(src) || neighbors2.has(tgt))) {
+          // Edges to 2nd order
+          res.color = hexWithAlpha('#8899aa', 0.15);
+          res.size = 0.8;
+          res.zIndex = 1;
         } else {
-          res.color = '#00000005';
-          res.size = 0.3;
+          // Rest: very faint but present
+          res.color = hexWithAlpha('#556677', 0.06);
+          res.size = 0.4;
           res.zIndex = 0;
         }
         return res;
@@ -356,7 +419,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       applyReducers();
     });
 
-    // Initial state
     applyReducers();
     containerRef.current!.style.cursor = 'grab';
 
@@ -367,48 +429,27 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     };
   }, [topics, relations, clusterMap, navigate, onOpenDiscussion]);
 
-  // Sync selection changes from outside (e.g. search)
+  // Sync selection
   useEffect(() => {
     selectedRef.current = selectedNode;
     const renderer = sigmaRef.current;
-    if (renderer) {
-      // Re-apply reducers
-      const graph = graphRef.current;
-      if (!graph) return;
-      const focus = hoveredRef.current || selectedNode;
-      if (!focus || !graph.hasNode(focus)) {
-        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => ({ ...data }));
-        renderer.setSetting('edgeReducer', null);
-      } else {
-        const neighborSet = new Set(graph.neighbors(focus));
-        neighborSet.add(focus);
-        renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
-          const res = { ...data };
-          if (node === focus) { res.highlighted = true; res.zIndex = 10; (res as any).forceLabel = true; res.size = ((data.size as number) || 8) * 1.3; }
-          else if (neighborSet.has(node)) { res.highlighted = true; res.zIndex = 5; (res as any).forceLabel = true; }
-          else { res.color = hexWithAlpha(graph.getNodeAttribute(node, 'originalColor') as string, 0.08); res.label = ''; res.zIndex = 0; }
-          return res;
-        });
-        renderer.setSetting('edgeReducer', (edge: string, data: Partial<EdgeDisplayData>) => {
-          const res = { ...data };
-          const src = graph.source(edge);
-          const tgt = graph.target(edge);
-          if (neighborSet.has(src) && neighborSet.has(tgt) && (src === focus || tgt === focus)) {
-            res.color = hexWithAlpha(graph.getNodeAttribute(focus, 'originalColor') as string, 0.7); res.size = 2.5; res.zIndex = 5;
-          } else { res.color = '#00000005'; res.size = 0.3; res.zIndex = 0; }
-          return res;
-        });
-      }
+    const graph = graphRef.current;
+    if (!renderer || !graph) return;
+    // Trigger re-render via a minimal reducer reset
+    const focus = hoveredRef.current || selectedNode;
+    if (!focus || !graph.hasNode(focus)) {
+      renderer.setSetting('nodeReducer', (_n: string, d: Partial<NodeDisplayData>) => ({ ...d }));
+      renderer.setSetting('edgeReducer', (_e: string, d: Partial<EdgeDisplayData>) => ({ ...d }));
+    } else {
+      // Full reducer logic — recreate from main effect is complex, just refresh
       renderer.refresh();
     }
   }, [selectedNode]);
 
-  // Notify parent
   useEffect(() => {
     onSelectNode?.(selectedNode, selectedNodeData);
   }, [selectedNode, selectedNodeData, onSelectNode]);
 
-  // Camera focus
   const focusNode = useCallback((nodeId: string) => {
     const renderer = sigmaRef.current;
     const graph = graphRef.current;
@@ -416,13 +457,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
     setSelectedNode(nodeId);
     setSearchOpen(false);
     setSearchQuery('');
-    const attrs = graph.getNodeAttributes(nodeId);
     const nodePos = renderer.getNodeDisplayData(nodeId);
     if (nodePos) {
-      renderer.getCamera().animate(
-        { x: nodePos.x, y: nodePos.y, ratio: 0.25 },
-        { duration: 400 },
-      );
+      renderer.getCamera().animate({ x: nodePos.x, y: nodePos.y, ratio: 0.3 }, { duration: 400 });
     }
   }, []);
 
@@ -440,46 +477,59 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       expanded && 'fixed inset-0 z-50 rounded-none',
       fullHeight && 'h-full',
     )}>
-      {/* Minimal toolbar — floats over graph */}
+      {/* Dark graph canvas */}
+      <div
+        ref={containerRef}
+        className="w-full h-full"
+        style={{
+          minHeight: fullHeight ? undefined : expanded ? '100vh' : '560px',
+          background: 'hsl(220 15% 8%)',
+        }}
+      />
+
+      {/* ── Top toolbar ── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 py-2 pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Cluster legend — compact */}
-          <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm rounded-full px-2.5 py-1 border border-border/50">
-            {clusters.map(c => (
-              <span
-                key={c.id}
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: c.color }}
-                title={`${c.label} (${c.nodeCount})`}
-              />
-            ))}
-            <span className="text-[9px] text-muted-foreground ml-1">{topics.length} topics</span>
-          </div>
+        {/* Cluster legend */}
+        <div className="flex items-center gap-1.5 pointer-events-auto bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/10">
+          {clusters.map(c => (
+            <button
+              key={c.id}
+              className="flex items-center gap-1 group"
+              title={`${c.label} — ${c.nodeCount} topics`}
+              onClick={() => {
+                // Focus first node in this cluster
+                if (c.nodeIds[0]) focusNode(c.nodeIds[0]);
+              }}
+            >
+              <span className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:scale-125 transition-transform" style={{ background: c.color }} />
+              <span className="text-[10px] text-white/50 group-hover:text-white/80 transition-colors hidden sm:inline">{c.label}</span>
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-1 pointer-events-auto">
-          <span className="text-[9px] text-muted-foreground/60 mr-1 hidden sm:inline">scroll zoom · drag pan · click focus</span>
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          <span className="text-[9px] text-white/30 mr-1 hidden sm:inline">scroll zoom · drag pan · dblclick open</span>
           {/* Search */}
           <div className="relative">
             <button
               onClick={() => setSearchOpen(o => !o)}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-card/80 backdrop-blur-sm transition-colors"
+              className="text-white/40 hover:text-white/80 p-1.5 rounded-full hover:bg-white/10 transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
             {searchOpen && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden">
-                <div className="flex items-center px-3 py-2 border-b border-border gap-2">
-                  <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div className="absolute right-0 top-full mt-1 w-64 bg-[hsl(220,15%,12%)] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden">
+                <div className="flex items-center px-3 py-2 border-b border-white/10 gap-2">
+                  <Search className="h-3.5 w-3.5 text-white/40 shrink-0" />
                   <input
                     autoFocus
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Find a topic…"
-                    className="flex-1 text-xs bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
+                    className="flex-1 text-xs bg-transparent outline-none text-white/90 placeholder:text-white/30"
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={() => setSearchQuery('')} className="text-white/40 hover:text-white/80">
                       <X className="h-3 w-3" />
                     </button>
                   )}
@@ -490,7 +540,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
                       <button
                         key={t.id}
                         onClick={() => focusNode(t.id)}
-                        className="w-full text-left px-3 py-2 text-xs text-foreground hover:bg-accent transition-colors flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-xs text-white/80 hover:bg-white/10 transition-colors flex items-center gap-2"
                       >
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CLUSTER_PALETTE[(clusterMap.get(t.category) ?? 0) % CLUSTER_PALETTE.length] }} />
                         <span className="truncate">{t.title}</span>
@@ -499,7 +549,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
                   </div>
                 )}
                 {searchQuery && searchResults.length === 0 && (
-                  <p className="px-3 py-3 text-xs text-muted-foreground">No topics found</p>
+                  <p className="px-3 py-3 text-xs text-white/30">No topics found</p>
                 )}
               </div>
             )}
@@ -507,7 +557,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
           {!fullHeight && (
             <button
               onClick={() => setExpanded(e => !e)}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-full hover:bg-card/80 backdrop-blur-sm transition-colors"
+              className="text-white/40 hover:text-white/80 p-1.5 rounded-full hover:bg-white/10 transition-colors"
             >
               {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             </button>
@@ -515,57 +565,84 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         </div>
       </div>
 
-      {/* Graph canvas — takes full space */}
-      <div
-        ref={containerRef}
-        className="w-full h-full bg-background"
-        style={{ minHeight: fullHeight ? undefined : expanded ? '100vh' : '560px' }}
-      />
+      {/* ── Gaps / bridge suggestions — bottom-left ── */}
+      {gaps.length > 0 && !selectedNodeData && (
+        <div className="absolute bottom-4 left-4 z-20 max-w-[260px]">
+          <div className="bg-black/50 backdrop-blur-md border border-white/10 rounded-xl p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-[10px] text-white/50 font-semibold uppercase tracking-wider">
+              <Sparkles className="h-3 w-3 text-amber-400/70" /> Gaps to explore
+            </div>
+            {gaps.slice(0, 3).map(gap => (
+              <button
+                key={gap.id}
+                onClick={() => {
+                  if (gap.bridgeNodes[0]) focusNode(gap.bridgeNodes[0]);
+                }}
+                className="w-full text-left group"
+              >
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-2 h-2 rounded-full" style={{ background: gap.colorA }} />
+                  <Link2 className="h-2.5 w-2.5 text-white/20 group-hover:text-amber-400/60 transition-colors" />
+                  <span className="w-2 h-2 rounded-full" style={{ background: gap.colorB }} />
+                </div>
+                <p className="text-[10px] text-white/40 group-hover:text-white/70 transition-colors leading-snug">
+                  {gap.suggestion}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Contextual node panel — appears on selection, overlays bottom-right */}
+      {/* ── Selected node panel — bottom-right ── */}
       {selectedNodeData && (
-        <div className="absolute bottom-4 right-4 z-20 w-72 bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+        <div className="absolute bottom-4 right-4 z-20 w-72 bg-[hsl(220,15%,12%)]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
           <div className="p-4">
             <div className="flex items-start justify-between gap-2 mb-3">
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-foreground leading-snug">{selectedNodeData.title}</h3>
-                <div className="flex items-center gap-2 mt-1">
+                <h3 className="text-sm font-semibold text-white/90 leading-snug">{selectedNodeData.title}</h3>
+                <div className="flex items-center gap-2 mt-1.5">
                   <span
                     className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
                     style={{
-                      background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '18',
+                      background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '25',
                       color: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length],
                     }}
                   >
                     {selectedNodeData.category}
                   </span>
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                  <span className="text-[10px] text-white/40 flex items-center gap-0.5">
                     <MessageSquare className="h-2.5 w-2.5" /> {selectedNodeData.postCount}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">{selectedNodeData.degree} connections</span>
+                  <span className="text-[10px] text-white/40">{selectedNodeData.degree} links</span>
+                  {selectedNodeData.bridgeScore > 1 && (
+                    <span className="text-[10px] text-amber-400/70 flex items-center gap-0.5">
+                      <Link2 className="h-2.5 w-2.5" /> bridge
+                    </span>
+                  )}
                 </div>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-muted-foreground hover:text-foreground p-0.5 shrink-0 mt-0.5">
+              <button onClick={() => setSelectedNode(null)} className="text-white/30 hover:text-white/70 p-0.5 shrink-0 mt-0.5">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            {/* Neighbors */}
+            {/* Connected topics */}
             {selectedNodeData.neighborTitles.length > 0 && (
               <div className="mb-3">
-                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Connected to</span>
+                <span className="text-[9px] font-semibold text-white/30 uppercase tracking-wider">Connected to</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedNodeData.neighborTitles.slice(0, 5).map((title, i) => (
                     <button
                       key={i}
                       onClick={() => focusNode(selectedNodeData.neighbors[i])}
-                      className="text-[10px] text-muted-foreground hover:text-foreground bg-accent/60 hover:bg-accent px-1.5 py-0.5 rounded transition-colors truncate max-w-[120px]"
+                      className="text-[10px] text-white/50 hover:text-white/80 bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors truncate max-w-[130px]"
                     >
-                      {title}
+                      {shortLabel(title)}
                     </button>
                   ))}
                   {selectedNodeData.neighborTitles.length > 5 && (
-                    <span className="text-[10px] text-muted-foreground/60 px-1 py-0.5">+{selectedNodeData.neighborTitles.length - 5} more</span>
+                    <span className="text-[10px] text-white/20 px-1 py-0.5">+{selectedNodeData.neighborTitles.length - 5}</span>
                   )}
                 </div>
               </div>
@@ -573,7 +650,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
 
             <button
               onClick={() => handleOpen(selectedNodeData.slug)}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
             >
               Open Discussion <ExternalLink className="h-3 w-3" />
             </button>
@@ -581,20 +658,24 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         </div>
       )}
 
-      {/* Bottom-left: expanded cluster legend on hover */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <div className="group">
-          <div className="bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 px-3 py-2 space-y-1 opacity-60 hover:opacity-100 transition-opacity">
+      {/* ── Cluster legend — bottom-left (when no gaps or when selected) ── */}
+      {(gaps.length === 0 || selectedNodeData) && (
+        <div className="absolute bottom-4 left-4 z-10">
+          <div className="bg-black/40 backdrop-blur-sm rounded-lg border border-white/8 px-3 py-2 space-y-1 opacity-60 hover:opacity-100 transition-opacity">
             {clusters.map(c => (
-              <div key={c.id} className="flex items-center gap-2 text-[10px]">
+              <button
+                key={c.id}
+                onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}
+                className="flex items-center gap-2 text-[10px] w-full text-left hover:bg-white/5 rounded px-1 -mx-1 transition-colors"
+              >
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
-                <span className="text-foreground/80 font-medium">{c.label}</span>
-                <span className="text-muted-foreground ml-auto">{c.nodeCount}</span>
-              </div>
+                <span className="text-white/60 font-medium">{c.label}</span>
+                <span className="text-white/25 ml-auto">{c.nodeCount}</span>
+              </button>
             ))}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

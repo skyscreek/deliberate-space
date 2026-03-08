@@ -1,11 +1,11 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Topic, ArgumentNode } from '@/types/discussion';
 import { useTopics } from '@/hooks/useTopics';
 import { useTopicRelations } from '@/hooks/useTopicRelations';
-import TopicNetworkGraph, { NodeData } from '@/components/graphs/TopicNetworkGraph';
+import TopicNetworkGraph from '@/components/graphs/TopicNetworkGraph';
 import { cn } from '@/lib/utils';
-import { Zap, HelpCircle, Lightbulb, ChevronRight, Swords } from 'lucide-react';
+import { Swords, HelpCircle, Lightbulb } from 'lucide-react';
 
 interface Props {
   topic: Topic;
@@ -22,7 +22,6 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
     navigate(`/d/${slug}`);
   }, [navigate]);
 
-  // Arg composition
   const argCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     function walk(n: ArgumentNode) {
@@ -40,7 +39,6 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
   };
   const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
   const hasGraph = allTopics && allTopics.length >= 2;
-
   const hasTensions = topic.tensions.length > 0;
   const hasQuestions = topic.openQuestions.length > 0;
   const hasProposals = topic.emergingProposals.length > 0;
@@ -48,9 +46,8 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
 
   return (
     <div className="relative">
-      {/* Graph fills the view — this IS the overview */}
       {hasGraph ? (
-        <div style={{ height: '600px' }} className="rounded-xl overflow-hidden border border-border">
+        <div style={{ height: '640px' }} className="rounded-xl overflow-hidden">
           <TopicNetworkGraph
             topics={allTopics!}
             relations={relations ?? []}
@@ -64,10 +61,8 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
         </div>
       )}
 
-      {/* Minimal context strip — only if there's analysis data */}
       {hasContextBar && (
-        <div className="mt-3 bg-card border border-border rounded-lg px-4 py-3 space-y-2.5">
-          {/* Arg bar */}
+        <div className="mt-2 bg-card/80 border border-border/50 rounded-lg px-4 py-2.5 space-y-2">
           {total > 0 && (
             <div className="flex items-center gap-3">
               <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden flex-1">
@@ -82,7 +77,7 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
                 ))}
               </div>
               <div className="flex gap-1.5 shrink-0">
-                {Object.entries(argCounts).slice(0, 5).map(([type, count]) => (
+                {Object.entries(argCounts).slice(0, 5).map(([type]) => (
                   <span key={type} className="flex items-center gap-0.5 text-[9px] text-muted-foreground capitalize">
                     <span className={cn('w-1.5 h-1.5 rounded-full', colorMap[type])} />{type}
                   </span>
@@ -91,7 +86,6 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
             </div>
           )}
 
-          {/* Inline tensions + questions */}
           <div className={cn('flex gap-4 flex-wrap', !hasTensions && !hasQuestions && 'hidden')}>
             {hasTensions && (
               <div className="flex items-center gap-2 flex-wrap">
@@ -99,11 +93,8 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
                   <Swords className="h-2.5 w-2.5 text-argdown-concern" /> Tensions
                 </span>
                 {topic.tensions.slice(0, 2).map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => t.relatedPostIds[0] && onSwitchToThread?.(t.relatedPostIds[0])}
-                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full"
-                  >
+                  <button key={t.id} onClick={() => t.relatedPostIds[0] && onSwitchToThread?.(t.relatedPostIds[0])}
+                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full">
                     {t.sideA.slice(0, 25)}… <span className="text-argdown-concern font-bold">vs</span> {t.sideB.slice(0, 25)}…
                   </button>
                 ))}
@@ -115,11 +106,8 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
                   <HelpCircle className="h-2.5 w-2.5 text-argdown-question" /> Open
                 </span>
                 {topic.openQuestions.slice(0, 2).map(q => (
-                  <button
-                    key={q.id}
-                    onClick={() => onSwitchToThread?.(q.raisedInPostId)}
-                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full truncate max-w-[200px]"
-                  >
+                  <button key={q.id} onClick={() => onSwitchToThread?.(q.raisedInPostId)}
+                    className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-accent/40 hover:bg-accent px-2 py-0.5 rounded-full truncate max-w-[200px]">
                     {q.question}
                   </button>
                 ))}
@@ -127,18 +115,14 @@ export default function OverviewView({ topic, onSwitchToThread, onSwitchToArgTyp
             )}
           </div>
 
-          {/* Proposals */}
           {hasProposals && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[9px] font-semibold text-muted-foreground uppercase flex items-center gap-0.5">
                 <Lightbulb className="h-2.5 w-2.5 text-argdown-proposal" /> Proposals
               </span>
               {topic.emergingProposals.map(ep => (
-                <button
-                  key={ep.id}
-                  onClick={() => ep.relatedPostIds[0] && onSwitchToThread?.(ep.relatedPostIds[0])}
-                  className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-argdown-proposal/8 hover:bg-argdown-proposal/15 border border-argdown-proposal/15 px-2 py-0.5 rounded-full"
-                >
+                <button key={ep.id} onClick={() => ep.relatedPostIds[0] && onSwitchToThread?.(ep.relatedPostIds[0])}
+                  className="text-[10px] text-foreground/70 hover:text-foreground transition-colors bg-argdown-proposal/8 hover:bg-argdown-proposal/15 border border-argdown-proposal/15 px-2 py-0.5 rounded-full">
                   {ep.title}
                 </button>
               ))}
