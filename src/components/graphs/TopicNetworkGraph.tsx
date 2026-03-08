@@ -9,15 +9,17 @@ import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
 import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 
-/* ── Cluster colours (match CSS tokens) ── */
-const CLUSTER_COLORS = [
-  'hsl(var(--graph-cluster-1))',
-  'hsl(var(--graph-cluster-2))',
-  'hsl(var(--graph-cluster-3))',
-  'hsl(var(--graph-cluster-4))',
-  'hsl(var(--graph-cluster-5))',
-  'hsl(var(--graph-cluster-6))',
+/* ── Cluster colours (raw HSL for Canvas API — CSS var() doesn't work in Canvas) ── */
+const CLUSTER_COLORS_HSL: [number, number, number][] = [
+  [340, 70, 55], [160, 60, 45], [45, 80, 55],
+  [270, 55, 58], [195, 70, 50], [15, 75, 55],
 ];
+const CLUSTER_COLORS = CLUSTER_COLORS_HSL.map(([h, s, l]) => `hsl(${h}, ${s}%, ${l}%)`);
+
+function hslA(idx: number, alpha: number) {
+  const [h, s, l] = CLUSTER_COLORS_HSL[idx % CLUSTER_COLORS_HSL.length];
+  return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+}
 
 /* ── Types ── */
 interface GraphNode extends SimulationNodeDatum {
@@ -241,7 +243,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       const cy = cluster.cy;
       const spread = Math.max(60, cluster.nodes.length * 25);
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, spread);
-      grad.addColorStop(0, cluster.color.replace(')', ' / 0.06)').replace('hsl(', 'hsla('));
+      grad.addColorStop(0, hslA(cluster.id, 0.06));
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.beginPath();
@@ -289,7 +291,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       // Glow for hovered/selected
       if (isHovered || isSelected) {
         const glow = ctx.createRadialGradient(node.x, node.y, r, node.x, node.y, r * 3);
-        glow.addColorStop(0, color.replace(')', ' / 0.35)').replace('hsl(', 'hsla('));
+        glow.addColorStop(0, hslA(node.cluster, 0.35));
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.beginPath();
@@ -335,7 +337,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       ctx.font = `700 ${fontSize}px Inter, system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = cluster.color.replace(')', ' / 0.25)').replace('hsl(', 'hsla(');
+      ctx.fillStyle = hslA(cluster.id, 0.25);
       ctx.fillText(cluster.label, cluster.cx, cluster.cy - 35);
     }
 
