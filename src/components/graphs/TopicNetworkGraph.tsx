@@ -188,7 +188,23 @@ function EdgeLine({
     pos.needsUpdate = true;
   });
 
-  return <line ref={lineRef as any} geometry={geometry} material={material} />;
+  const lineObj = useMemo(() => {
+    const l = new THREE.Line(geometry, material);
+    return l;
+  }, [geometry, material]);
+
+  const groupRef = useRef<THREE.Group>(null!);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const geo = lineObj.geometry;
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    pos.setXYZ(0, (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08);
+    pos.setXYZ(1, (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08);
+    pos.needsUpdate = true;
+  });
+
+  return <primitive ref={groupRef} object={lineObj} />;
 }
 
 /* ── Cluster label ── */
