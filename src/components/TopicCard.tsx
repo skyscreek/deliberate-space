@@ -28,7 +28,7 @@ export default function TopicCard({ topic, preview }: TopicCardProps) {
       <div className="surface-card-elevated p-5 hover:border-primary/30 transition-all">
         {/* Top row: category + status */}
         <div className="flex items-center justify-between mb-2.5">
-          <Badge variant="outline" className="text-[11px] font-medium px-2 py-0.5 border-border">{topic.category}</Badge>
+          <Link to={`/category/${topic.category.toLowerCase().replace(/\s+/g, '-')}`} onClick={(e) => e.stopPropagation()} className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-border text-primary hover:bg-primary/5 transition-colors">{topic.category}</Link>
           <Badge className={cn('text-[10px] border shrink-0 px-2 py-0.5', status.className)}>
             {status.label}
           </Badge>
