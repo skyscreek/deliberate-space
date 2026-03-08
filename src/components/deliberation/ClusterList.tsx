@@ -3,7 +3,6 @@ import { useDiscussion } from '@/context/DiscussionContext';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Layers } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 
 export default function ClusterList({ clusters }: { clusters: ArgumentCluster[] }) {
@@ -13,10 +12,10 @@ export default function ClusterList({ clusters }: { clusters: ArgumentCluster[] 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="flex w-full items-center justify-between py-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Argument Clusters</h3>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Clusters</h3>
+        <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-2 pt-2">
+      <CollapsibleContent className="space-y-1.5 pt-2">
         {clusters.map((c) => {
           const isActive = activeFilter?.type === 'cluster' && activeFilter.id === c.id;
           return (
@@ -24,16 +23,16 @@ export default function ClusterList({ clusters }: { clusters: ArgumentCluster[] 
               key={c.id}
               onClick={() => isActive ? setFilter(null) : setFilter({ type: 'cluster', id: c.id, relatedPostIds: c.relatedPostIds })}
               className={cn(
-                'w-full text-left glass-subtle rounded-lg p-3 transition-all duration-200 hover:ring-1 hover:ring-primary/30',
-                isActive && 'ring-2 ring-highlight bg-highlight-bg',
+                'w-full text-left rounded-md border border-border/40 bg-accent/20 p-2.5 text-xs transition-all hover:border-primary/30',
+                isActive && 'ring-1 ring-highlight/60 bg-highlight-bg border-highlight/30',
               )}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <Layers className="h-3.5 w-3.5 text-primary/60" />
-                <span className="text-xs font-semibold text-foreground">{c.name}</span>
-                <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">{c.postCount}</Badge>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Layers className="h-3 w-3 text-primary/50" />
+                <span className="font-semibold text-foreground">{c.name}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.postCount}</span>
               </div>
-              <p className="text-xs text-muted-foreground">{c.description}</p>
+              <p className="text-muted-foreground leading-snug">{c.description}</p>
             </button>
           );
         })}

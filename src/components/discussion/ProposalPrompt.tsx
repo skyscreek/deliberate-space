@@ -1,20 +1,19 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 
 export default function ProposalPrompt({ text }: { text: string }) {
   return (
-    <div className="glass rounded-lg border-l-4 border-l-primary overflow-hidden">
-      <CardContent className="p-5">
+    <div className="surface-card border-l-4 border-l-primary overflow-hidden">
+      <div className="p-4">
         <div className="flex items-start gap-3">
-          <FileText className="h-5 w-5 mt-0.5 text-primary shrink-0" />
+          <FileText className="h-4 w-4 mt-0.5 text-primary shrink-0" />
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Discussion Prompt</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Discussion Prompt</p>
             {text.split('\n').filter(Boolean).map((para, i) => (
-              <p key={i} className="text-sm leading-relaxed text-foreground">{para}</p>
+              <p key={i} className="text-sm leading-relaxed text-foreground/90">{para}</p>
             ))}
           </div>
         </div>
-      </CardContent>
+      </div>
     </div>
   );
 }

@@ -15,11 +15,9 @@ const authors = {
 
 const argumentMap: ArgumentNode[] = [
   {
-    id: 'am-1',
-    type: 'claim',
+    id: 'am-1', type: 'claim',
     text: 'Congestion pricing will reduce downtown traffic by 15–25% and improve air quality',
-    author: 'Maria Chen',
-    relatedPostIds: ['p1'],
+    author: 'Maria Chen', relatedPostIds: ['p1'],
     children: [
       {
         id: 'am-1-1', type: 'support',
@@ -245,6 +243,8 @@ export const congestionTopic: Topic = {
   ],
 };
 
+// ---- Stub topics for home page feed ----
+
 export const stubTopics: TopicMeta[] = [
   {
     id: 'topic-1',
@@ -267,7 +267,7 @@ export const stubTopics: TopicMeta[] = [
     createdAt: '2026-02-20T09:00:00Z',
     lastActivity: '2026-03-06T14:20:00Z',
     participantCount: 31,
-    postCount: 8,
+    postCount: 18,
     proposal: 'The library board proposes converting 30% of physical book space to digital labs, co-working areas, and community program rooms.',
   },
   {
@@ -282,10 +282,75 @@ export const stubTopics: TopicMeta[] = [
     postCount: 24,
     proposal: 'A proposal to require all students K-12 to store phones in locked pouches during school hours, with exceptions for medical needs.',
   },
+  {
+    id: 'topic-4',
+    title: 'How should the city address the housing affordability crisis?',
+    category: 'Housing',
+    status: 'active',
+    author: { id: 'a13', name: 'Elena Torres', avatar: 'ET', color: '355 45% 50%', role: 'Housing Coalition' },
+    createdAt: '2026-02-25T08:00:00Z',
+    lastActivity: '2026-03-07T18:10:00Z',
+    participantCount: 112,
+    postCount: 42,
+    proposal: 'The city is exploring rent stabilization, inclusionary zoning, and a housing trust fund. Which combination of policies would best address the crisis?',
+  },
+  {
+    id: 'topic-5',
+    title: 'Should we allow autonomous delivery robots on sidewalks?',
+    category: 'Technology',
+    status: 'active',
+    author: { id: 'a14', name: 'Marcus Johnson', avatar: 'MJ', color: '30 45% 45%', role: 'Tech Policy Advisor' },
+    createdAt: '2026-03-02T11:00:00Z',
+    lastActivity: '2026-03-07T12:30:00Z',
+    participantCount: 28,
+    postCount: 9,
+    proposal: 'Two companies are requesting permits to operate delivery robots on city sidewalks. Should the city approve a pilot program?',
+  },
+  {
+    id: 'topic-6',
+    title: 'Redesigning the downtown waterfront: park vs. mixed-use development',
+    category: 'Urban Planning',
+    status: 'active',
+    author: { id: 'a15', name: 'Anna Kowalski', avatar: 'AK', color: '160 40% 48%', role: 'Parks Commission' },
+    createdAt: '2026-02-18T09:30:00Z',
+    lastActivity: '2026-03-06T21:00:00Z',
+    participantCount: 64,
+    postCount: 31,
+    proposal: 'The 12-acre downtown waterfront site is being vacated. Should it become a public park or a mixed-use development with affordable housing?',
+  },
+  {
+    id: 'topic-7',
+    title: 'Police reform: community oversight board proposal',
+    category: 'Public Safety',
+    status: 'seeking-consensus',
+    author: { id: 'a16', name: 'Darnell Washington', avatar: 'DW', color: '270 40% 48%', role: 'Community Organizer' },
+    createdAt: '2026-02-10T10:00:00Z',
+    lastActivity: '2026-03-07T08:00:00Z',
+    participantCount: 156,
+    postCount: 67,
+    proposal: 'A citizen-led proposal to create an independent civilian oversight board with subpoena power and binding disciplinary recommendations.',
+  },
+  {
+    id: 'topic-8',
+    title: 'Should the city invest in a municipal broadband network?',
+    category: 'Infrastructure',
+    status: 'active',
+    author: { id: 'a17', name: 'Yuki Tanaka', avatar: 'YT', color: '200 50% 50%', role: 'City IT Director' },
+    createdAt: '2026-03-03T14:00:00Z',
+    lastActivity: '2026-03-07T15:45:00Z',
+    participantCount: 35,
+    postCount: 14,
+    proposal: 'The city is considering a $120M municipal fiber network to compete with private ISPs. Would this improve access and lower costs, or is it too risky?',
+  },
 ];
 
 export const topicDeliberationPreviews: Record<string, { tensions: number; openQuestions: number; topCluster: string; summary: string }> = {
-  'topic-1': { tensions: 3, openQuestions: 3, topCluster: 'Equity & Affordability', summary: 'Polarized between economic burden and environmental benefits. Exemption design is emerging as key.' },
+  'topic-1': { tensions: 3, openQuestions: 3, topCluster: 'Equity & Affordability', summary: 'Polarized between economic burden and environmental benefits. Exemption design is the emerging key.' },
   'topic-2': { tensions: 2, openQuestions: 4, topCluster: 'Digital Access Equity', summary: 'Broad support for modernization but concern about losing quiet study spaces and serving elderly users.' },
-  'topic-3': { tensions: 2, openQuestions: 2, topCluster: 'Student Autonomy', summary: 'Moving toward consensus on a trial period. Teachers largely supportive; students and some parents opposed.' },
+  'topic-3': { tensions: 2, openQuestions: 2, topCluster: 'Student Autonomy', summary: 'Moving toward consensus on a trial period. Teachers supportive; students and parents divided.' },
+  'topic-4': { tensions: 4, openQuestions: 5, topCluster: 'Rent Control Debate', summary: 'Deep divide on rent stabilization. Developers warn of supply reduction; tenants demand immediate relief.' },
+  'topic-5': { tensions: 2, openQuestions: 3, topCluster: 'Sidewalk Access', summary: 'Disability groups concerned about sidewalk safety. Tech advocates cite efficiency and emission reduction.' },
+  'topic-6': { tensions: 3, openQuestions: 3, topCluster: 'Public vs. Private Use', summary: 'Strong community support for green space. Developers argue housing is the greater need.' },
+  'topic-7': { tensions: 3, openQuestions: 4, topCluster: 'Accountability vs. Autonomy', summary: 'Nearing consensus on board structure but disagreement on subpoena power and binding authority.' },
+  'topic-8': { tensions: 2, openQuestions: 3, topCluster: 'Cost vs. Access', summary: 'Rural areas strongly in favor. Fiscal conservatives worry about the $120M risk if adoption is low.' },
 };
