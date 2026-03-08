@@ -9,7 +9,7 @@ import ThreadView from '@/components/discussion/ThreadView';
 import ComposerBox from '@/components/discussion/ComposerBox';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
 import DeliberationSidebar from '@/components/deliberation/DeliberationSidebar';
-import { ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch } from 'lucide-react';
+import { ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle } from '@/components/ui/sheet';
