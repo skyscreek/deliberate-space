@@ -463,7 +463,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
       <div className="flex" style={{ height: expanded ? 'calc(100% - 40px)' : graphHeight }}>
         {/* 3D Canvas */}
-        <div className="flex-1 relative bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
+        <div className="flex-1 relative bg-muted/30">
           <Canvas
             camera={{ position: [0, 0, 25], fov: 60 }}
             style={{ width: '100%', height: '100%' }}
