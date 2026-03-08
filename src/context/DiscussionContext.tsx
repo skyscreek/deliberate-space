@@ -38,9 +38,12 @@ export function DiscussionProvider({ children }: { children: React.ReactNode }) 
 
   const startAssistedComment = useCallback((comment: AssistedComment) => {
     setAssistedComment(comment);
-    setReplyingToPostId(comment.replyToPostId || comment.targetPostId || null);
-    if (comment.targetPostId) {
-      setScrollToPostId(comment.targetPostId);
+    // Set reply target: use replyToPostId first, fallback to targetPostId
+    const targetId = comment.replyToPostId || comment.targetPostId || null;
+    setReplyingToPostId(targetId);
+    // Scroll to the target post
+    if (targetId) {
+      setScrollToPostId(targetId);
     }
   }, []);
 
