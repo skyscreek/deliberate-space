@@ -633,11 +633,22 @@ function DiscussionContent() {
               </p>
             </div>
           ) : (
-            <ArgumentMapView
-              nodes={topicForViews.argumentMap}
-              onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
-              initialFilter={argMapFilter}
-            />
+            <div className="space-y-4">
+              {/* Interactive graph visualization */}
+              <ArgumentGraph
+                nodes={topicForViews.argumentMap}
+                onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+              />
+              {/* Tree view below */}
+              <div className="border-t border-border/40 pt-4">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Tree View</h3>
+                <ArgumentMapView
+                  nodes={topicForViews.argumentMap}
+                  onSwitchToThread={(postId) => { setActiveTab('discussion'); setTimeout(() => scrollToPost(postId), 100); }}
+                  initialFilter={argMapFilter}
+                />
+              </div>
+            </div>
           )}
         </TabsContent>
       </Tabs>
