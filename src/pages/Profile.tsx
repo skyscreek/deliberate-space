@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { useProfile, useProfileTopics, useProfilePosts, useUpdateProfile } from '@/hooks/useProfile';
+import { useProfile, useProfileByUsername, useProfileTopics, useProfilePosts, useUpdateProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import UserMenu from '@/components/UserMenu';
@@ -24,15 +24,18 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function Profile() {
-  const { userId } = useParams();
+  const { username } = useParams();
   const { user: currentUser } = useAuth();
-  const targetUserId = userId || currentUser?.id;
+
+  // If viewing by username, look up profile by username; otherwise show own profile
+  const { data: lookedUpProfile } = useProfileByUsername(username);
+  const targetUserId = username ? lookedUpProfile?.user_id : currentUser?.id;
 
   const { data: profile, isLoading: profileLoading } = useProfile(targetUserId);
   const { data: topics } = useProfileTopics(targetUserId);
   const { data: posts } = useProfilePosts(targetUserId);
 
-  const isOwnProfile = !userId || currentUser?.id === targetUserId;
+  const isOwnProfile = !username || currentUser?.id === targetUserId;
 
   if (profileLoading) {
     return (
