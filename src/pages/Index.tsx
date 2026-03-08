@@ -18,7 +18,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6 space-y-4">
+      <main className="mx-auto max-w-3xl px-4 py-6 space-y-5">
         {/* Active stats bar */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
           <span className="flex items-center gap-1.5">
@@ -31,13 +31,11 @@ const Index = () => {
           <span>{stubTopics.reduce((s, t) => s + t.postCount, 0)} contributions</span>
         </div>
 
-        {/* Discussion feed */}
-        <div className="surface-card-elevated overflow-hidden">
-          <div className="divide-y divide-border/60">
-            {stubTopics.map((topic) => (
-              <TopicCard key={topic.id} topic={topic} preview={topicDeliberationPreviews[topic.id]} />
-            ))}
-          </div>
+        {/* Discussion feed — separate cards */}
+        <div className="space-y-3">
+          {stubTopics.map((topic) => (
+            <TopicCard key={topic.id} topic={topic} preview={topicDeliberationPreviews[topic.id]} />
+          ))}
         </div>
       </main>
     </div>
