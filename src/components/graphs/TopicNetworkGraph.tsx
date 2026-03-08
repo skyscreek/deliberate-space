@@ -359,6 +359,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       labelWeight: '500',
       labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
       defaultDrawNodeLabel: drawNodeLabel,
+      defaultDrawNodeHover: drawNodeHover,
       stagePadding: 60,
       labelRenderedSizeThreshold: 7,
       defaultNodeColor: '#556677',
