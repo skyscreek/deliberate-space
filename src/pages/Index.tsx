@@ -30,7 +30,7 @@ function TopicCardLive({ topic }: { topic: TopicRow }) {
   const initials = authorName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <Link to={`/discussion/${topic.id}`} className="block group">
+    <Link to={`/d/${topic.slug}`} className="block group">
       <div className="surface-card-elevated p-5 hover:border-primary/30 transition-all">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-border text-primary">{topic.category}</span>
@@ -84,7 +84,7 @@ function CreateTopicDialog() {
       const data = await createTopic.mutateAsync({ title, description, category, proposal });
       setOpen(false);
       setTitle(''); setDescription(''); setCategory('General'); setProposal('');
-      navigate(`/discussion/${data.id}`);
+      navigate(`/d/${data.slug}`);
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
