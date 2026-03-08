@@ -131,8 +131,8 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     const connected = new Set<string>();
     connected.add(hoveredNode);
     for (const l of links) {
-      const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source;
-      const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target;
+      const src = typeof l.source === 'object' ? (l.source as GraphNode).id : String(l.source);
+      const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : String(l.target);
       if (src === hoveredNode) connected.add(tgt);
       if (tgt === hoveredNode) connected.add(src);
     }
