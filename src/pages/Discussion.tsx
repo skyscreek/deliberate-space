@@ -17,6 +17,7 @@ type ViewTab = 'thread' | 'overview' | 'argument-map';
 export default function Discussion() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState<ViewTab>('thread');
+  const [argTypeFilter, setArgTypeFilter] = useState<string | undefined>(undefined);
   const topic = congestionTopic;
 
   const tabs: { id: ViewTab; label: string; icon: typeof MessageSquare }[] = [
@@ -91,10 +92,10 @@ export default function Discussion() {
             </div>
           )}
           {activeTab === 'overview' && (
-            <OverviewView topic={topic} onSwitchToThread={handleSwitchToThread} />
+            <OverviewView topic={topic} onSwitchToThread={handleSwitchToThread} onSwitchToArgType={(type) => { setArgTypeFilter(type); setActiveTab('argument-map'); }} />
           )}
           {activeTab === 'argument-map' && (
-            <ArgumentMapView nodes={topic.argumentMap} onSwitchToThread={handleSwitchToThread} />
+            <ArgumentMapView nodes={topic.argumentMap} onSwitchToThread={handleSwitchToThread} initialFilter={argTypeFilter} />
           )}
         </main>
       </div>
