@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Canvas, useFrame, useThree, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Text, Billboard } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, forceX, forceY,
@@ -10,7 +10,7 @@ import {
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Network, Lightbulb, ChevronRight, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, ChevronDown, ChevronUp } from 'lucide-react';
 
 /* ── Cluster colours ── */
 const CLUSTER_COLORS_HSL: [number, number, number][] = [
@@ -72,8 +72,10 @@ function computeImportance(nodeId: string, links: { source: string; target: stri
   return degree;
 }
 
-/* ── 3D Scene components ── */
-interface NodeSphereProps {
+/* ── 3D Node ── */
+function NodeSphere({
+  node, isHovered, isSelected, isDimmed, onHover, onSelect, onDoubleClick,
+}: {
   node: GraphNode;
   isHovered: boolean;
   isSelected: boolean;
@@ -81,31 +83,28 @@ interface NodeSphereProps {
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
   onDoubleClick: (slug: string) => void;
-}
-
-function NodeSphere({ node, isHovered, isSelected, isDimmed, onHover, onSelect, onDoubleClick }: NodeSphereProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
+}) {
+  const meshRef = useRef<THREE.Mesh>(null!);
   const color = CLUSTER_THREE_COLORS[node.cluster % CLUSTER_THREE_COLORS.length];
   const radius = Math.max(0.3, Math.min(1.2, 0.3 + node.postCount * 0.1 + node.importance * 0.15));
 
   useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.position.set(
-        (node.x ?? 0) * 0.08,
-        (node.y ?? 0) * -0.08,
-        (node.z ?? 0) * 0.08,
-      );
-      const targetScale = isHovered ? 1.3 : isSelected ? 1.15 : 1;
-      meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
-    }
+    if (!meshRef.current) return;
+    meshRef.current.position.set(
+      (node.x ?? 0) * 0.08,
+      (node.y ?? 0) * -0.08,
+      (node.z ?? 0) * 0.08,
+    );
+    const s = isHovered ? 1.3 : isSelected ? 1.15 : 1;
+    meshRef.current.scale.lerp(new THREE.Vector3(s, s, s), 0.15);
   });
 
   return (
     <group>
       <mesh
         ref={meshRef}
-        onPointerEnter={(e) => { e.stopPropagation(); onHover(node.id); }}
-        onPointerLeave={(e) => { e.stopPropagation(); onHover(null); }}
+        onPointerOver={(e) => { e.stopPropagation(); onHover(node.id); }}
+        onPointerOut={(e) => { e.stopPropagation(); onHover(null); }}
         onClick={(e) => { e.stopPropagation(); onSelect(node.id); }}
         onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(node.slug); }}
       >
@@ -120,66 +119,56 @@ function NodeSphere({ node, isHovered, isSelected, isDimmed, onHover, onSelect, 
           metalness={0.1}
         />
       </mesh>
-      {/* Label */}
+      {/* HTML label overlay */}
       {(isHovered || isSelected || !isDimmed) && (
-        <Billboard
+        <Html
           position={[
             (node.x ?? 0) * 0.08,
-            (node.y ?? 0) * -0.08 + radius + 0.35,
+            (node.y ?? 0) * -0.08 + radius + 0.4,
             (node.z ?? 0) * 0.08,
           ]}
+          center
+          distanceFactor={15}
+          style={{ pointerEvents: 'none' }}
         >
-          <Text
-            fontSize={isHovered ? 0.35 : 0.25}
-            color={isDimmed ? '#999' : '#333'}
-            anchorX="center"
-            anchorY="bottom"
-            font="/fonts/inter-medium.woff"
-            maxWidth={8}
+          <div
+            className={cn(
+              'whitespace-nowrap text-center select-none px-1.5 py-0.5 rounded',
+              isDimmed ? 'text-muted-foreground/50' : 'text-foreground',
+              isHovered && 'font-semibold text-sm',
+              !isHovered && 'text-xs',
+            )}
+            style={{
+              textShadow: '0 1px 4px hsl(var(--background))',
+            }}
           >
             {node.title.length > 32 ? node.title.slice(0, 30) + '…' : node.title}
-          </Text>
-        </Billboard>
+          </div>
+        </Html>
       )}
     </group>
   );
 }
 
-interface EdgeLineProps {
+/* ── 3D Edge ── */
+function EdgeLine({
+  source, target, sameCluster, clusterIdx, isDimmed, isHighlighted,
+}: {
   source: GraphNode;
   target: GraphNode;
   sameCluster: boolean;
   clusterIdx: number;
   isDimmed: boolean;
   isHighlighted: boolean;
-}
-
-function EdgeLine({ source, target, sameCluster, clusterIdx, isDimmed, isHighlighted }: EdgeLineProps) {
-  const lineRef = useRef<THREE.LineSegments>(null);
-
+}) {
   const color = sameCluster
     ? CLUSTER_THREE_COLORS[clusterIdx % CLUSTER_THREE_COLORS.length]
     : new THREE.Color('#aaa');
-
   const opacity = isDimmed ? 0.03 : isHighlighted ? 0.7 : 0.15;
 
-  useFrame(() => {
-    if (lineRef.current) {
-      const geo = lineRef.current.geometry;
-      const positions = new Float32Array([
-        (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08,
-        (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08,
-      ]);
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.attributes.position.needsUpdate = true;
-    }
-  });
-
-  // Build initial geometry
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array([0, 0, 0, 0, 0, 0]);
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
     return geo;
   }, []);
 
@@ -188,34 +177,52 @@ function EdgeLine({ source, target, sameCluster, clusterIdx, isDimmed, isHighlig
     [color, opacity]
   );
 
-  return <lineSegments ref={lineRef} geometry={geometry} material={material} />;
+  const lineObj = useMemo(() => {
+    const l = new THREE.Line(geometry, material);
+    return l;
+  }, [geometry, material]);
+
+  const groupRef = useRef<THREE.Group>(null!);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const geo = lineObj.geometry;
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    pos.setXYZ(0, (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08);
+    pos.setXYZ(1, (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08);
+    pos.needsUpdate = true;
+  });
+
+  return <primitive ref={groupRef} object={lineObj} />;
 }
 
+/* ── Cluster label ── */
 function ClusterLabel({ cluster }: { cluster: Cluster }) {
   return (
-    <Billboard
+    <Html
       position={[
         cluster.cx * 0.08,
         cluster.cy * -0.08 - 2,
         cluster.cz * 0.08,
       ]}
+      center
+      distanceFactor={20}
+      style={{ pointerEvents: 'none' }}
     >
-      <Text
-        fontSize={0.6}
-        color={CLUSTER_COLORS[cluster.id % CLUSTER_COLORS.length]}
-        anchorX="center"
-        anchorY="middle"
-        fillOpacity={0.2}
-        font="/fonts/inter-bold.woff"
+      <div
+        className="text-sm font-bold opacity-25 whitespace-nowrap select-none"
+        style={{ color: CLUSTER_COLORS[cluster.id % CLUSTER_COLORS.length] }}
       >
         {cluster.label}
-      </Text>
-    </Billboard>
+      </div>
+    </Html>
   );
 }
 
 /* ── Scene ── */
-interface SceneProps {
+function Scene({
+  nodes, links, clusters, hoveredNode, selectedNode, onHover, onSelect, onDoubleClick,
+}: {
   nodes: GraphNode[];
   links: GraphLink[];
   clusters: Cluster[];
@@ -224,9 +231,7 @@ interface SceneProps {
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
   onDoubleClick: (slug: string) => void;
-}
-
-function Scene({ nodes, links, clusters, hoveredNode, selectedNode, onHover, onSelect, onDoubleClick }: SceneProps) {
+}) {
   const connectedToHovered = useMemo(() => {
     if (!hoveredNode) return new Set<string>();
     const s = new Set<string>([hoveredNode]);
@@ -241,11 +246,10 @@ function Scene({ nodes, links, clusters, hoveredNode, selectedNode, onHover, onS
 
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.7} />
       <pointLight position={[10, 10, 10]} intensity={0.8} />
       <pointLight position={[-10, -10, -10]} intensity={0.3} />
 
-      {/* Edges */}
       {links.map(l => {
         const src = l.source as GraphNode;
         const tgt = l.target as GraphNode;
@@ -265,7 +269,6 @@ function Scene({ nodes, links, clusters, hoveredNode, selectedNode, onHover, onS
         );
       })}
 
-      {/* Nodes */}
       {nodes.map(node => (
         <NodeSphere
           key={node.id}
@@ -279,7 +282,6 @@ function Scene({ nodes, links, clusters, hoveredNode, selectedNode, onHover, onS
         />
       ))}
 
-      {/* Cluster labels */}
       {clusters.map(c => (
         <ClusterLabel key={c.id} cluster={c} />
       ))}
@@ -310,6 +312,9 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [topicsOpen, setTopicsOpen] = useState(true);
+  const [gapsOpen, setGapsOpen] = useState(true);
+  const [statsOpen, setStatsOpen] = useState(false);
   const navigate = useNavigate();
 
   const clusterMap = useMemo(
@@ -317,7 +322,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     [topics]
   );
 
-  // Build 3D simulation
   useEffect(() => {
     if (topics.length === 0) return;
 
@@ -335,7 +339,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         status: t.status,
         cluster: clusterIdx,
         importance: imp,
-        // Initialize z with cluster-based spread
         z: (clusterIdx - 3) * 15 + (Math.random() - 0.5) * 20,
       };
     });
@@ -350,7 +353,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
         relationType: r.relation_type,
       }));
 
-    // 2D force sim for x/y, then we keep z from initial assignment with some attraction
     const sim = forceSimulation<GraphNode>(graphNodes)
       .force('link', forceLink<GraphNode, GraphLink>(graphLinks).id(d => d.id).distance(100).strength(0.6))
       .force('charge', forceManyBody().strength(-250))
@@ -360,7 +362,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
       .force('y', forceY(0).strength(0.02))
       .alphaDecay(0.015)
       .on('tick', () => {
-        // Gradually pull z toward cluster centroid
         for (const n of graphNodes) {
           const targetZ = (n.cluster - 3) * 12;
           n.z = (n.z ?? 0) * 0.98 + targetZ * 0.02;
@@ -372,7 +373,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     return () => { sim.stop(); };
   }, [topics, relations, clusterMap]);
 
-  // Clusters
   const clusters = useMemo<Cluster[]>(() => {
     if (nodes.length === 0) return [];
     const groups = new Map<number, GraphNode[]>();
@@ -393,7 +393,6 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     })).sort((a, b) => b.percentage - a.percentage);
   }, [nodes]);
 
-  // Gaps
   const gaps = useMemo(() => {
     if (clusters.length < 2) return [];
     const interLinks = new Map<string, number>();
@@ -463,10 +462,10 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
       <div className="flex" style={{ height: expanded ? 'calc(100% - 40px)' : graphHeight }}>
         {/* 3D Canvas */}
-        <div className="flex-1 relative bg-muted/30">
+        <div className="flex-1 relative" style={{ minHeight: '400px' }}>
           <Canvas
             camera={{ position: [0, 0, 25], fov: 60 }}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%', background: 'hsl(var(--muted))' }}
             dpr={[1, 2]}
           >
             <Scene
@@ -486,8 +485,8 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
             {clusters.map(c => (
               <span
                 key={c.id}
-                className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm"
-                style={{ background: hslA(c.id, 0.15), color: c.color, border: `1px solid ${hslA(c.id, 0.3)}` }}
+                className="text-[10px] px-2 py-0.5 rounded-full font-medium backdrop-blur-sm bg-card/80"
+                style={{ color: c.color, border: `1px solid ${hslA(c.id, 0.3)}` }}
               >
                 {c.label}
               </span>
@@ -502,59 +501,75 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
             sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
           )}
         >
-          <div className="p-3 space-y-4 w-64">
-            {/* Main Topics */}
+          <div className="p-3 space-y-3 w-64">
+            {/* Main Topics — collapsible */}
             <div>
-              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Main Topics</h4>
-              <div className="space-y-1.5">
-                {clusters.map(c => (
-                  <div key={c.id} className="flex items-center gap-2">
-                    <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap text-white"
-                      style={{ background: c.color }}
-                    >
-                      {c.percentage}%: {c.label}
-                    </span>
+              <button
+                onClick={() => setTopicsOpen(o => !o)}
+                className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors"
+              >
+                Main Topics
+                {topicsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+              {topicsOpen && (
+                <>
+                  <div className="space-y-1.5">
+                    {clusters.map(c => (
+                      <div key={c.id} className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap text-white"
+                          style={{ background: c.color }}
+                        >
+                          {c.percentage}%: {c.label}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {clusters.flatMap(c => c.nodes.slice(0, 3)).map(n => (
-                  <span key={n.id} className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                    {n.title.length > 20 ? n.title.slice(0, 18) + '…' : n.title}
-                  </span>
-                ))}
-              </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {clusters.flatMap(c => c.nodes.slice(0, 3)).map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => handleSelect(n.id)}
+                        className="text-[9px] text-muted-foreground bg-muted hover:bg-accent px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                      >
+                        {n.title.length > 20 ? n.title.slice(0, 18) + '…' : n.title}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Gaps to Connect */}
+            {/* Gaps to Connect — collapsible */}
             {gaps.length > 0 && (
               <div>
-                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Lightbulb className="h-3 w-3" /> Gaps to Connect
-                </h4>
-                <div className="space-y-2">
-                  {gaps.map((gap, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white"
-                        style={{ background: gap.a.color }}
-                      >
-                        {gap.a.label}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">↔</span>
-                      <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white"
-                        style={{ background: gap.b.color }}
-                      >
-                        {gap.b.label}
-                      </span>
+                <button
+                  onClick={() => setGapsOpen(o => !o)}
+                  className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors"
+                >
+                  <span className="flex items-center gap-1"><Lightbulb className="h-3 w-3" /> Gaps to Connect</span>
+                  {gapsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+                {gapsOpen && (
+                  <>
+                    <div className="space-y-2">
+                      {gaps.map((gap, i) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white" style={{ background: gap.a.color }}>
+                            {gap.a.label}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">↔</span>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white" style={{ background: gap.b.color }}>
+                            {gap.b.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">
-                  These topic clusters have few connections. Bridge them with new discussions.
-                </p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">
+                      These topic clusters have few connections. Bridge them with new discussions.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
@@ -578,27 +593,35 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
               </div>
             )}
 
-            {/* Stats */}
+            {/* Stats — collapsible */}
             <div className="border-t border-border pt-3">
-              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h4>
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-muted rounded p-2">
-                  <div className="text-sm font-bold text-foreground">{topics.length}</div>
-                  <div className="text-[9px] text-muted-foreground">Topics</div>
+              <button
+                onClick={() => setStatsOpen(o => !o)}
+                className="flex items-center justify-between w-full text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 hover:text-foreground transition-colors"
+              >
+                Stats
+                {statsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+              {statsOpen && (
+                <div className="grid grid-cols-2 gap-2 text-center mt-1">
+                  <div className="bg-muted rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{topics.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Topics</div>
+                  </div>
+                  <div className="bg-muted rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{relations.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Connections</div>
+                  </div>
+                  <div className="bg-muted rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{clusters.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Clusters</div>
+                  </div>
+                  <div className="bg-muted rounded p-2">
+                    <div className="text-sm font-bold text-foreground">{gaps.length}</div>
+                    <div className="text-[9px] text-muted-foreground">Gaps</div>
+                  </div>
                 </div>
-                <div className="bg-muted rounded p-2">
-                  <div className="text-sm font-bold text-foreground">{relations.length}</div>
-                  <div className="text-[9px] text-muted-foreground">Connections</div>
-                </div>
-                <div className="bg-muted rounded p-2">
-                  <div className="text-sm font-bold text-foreground">{clusters.length}</div>
-                  <div className="text-[9px] text-muted-foreground">Clusters</div>
-                </div>
-                <div className="bg-muted rounded p-2">
-                  <div className="text-sm font-bold text-foreground">{gaps.length}</div>
-                  <div className="text-[9px] text-muted-foreground">Gaps</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
