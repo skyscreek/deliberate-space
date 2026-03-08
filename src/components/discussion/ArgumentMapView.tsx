@@ -113,15 +113,14 @@ function ArgumentNodeCard({ node, depth = 0, switchToThread }: { node: ArgumentN
                       <span className="text-[9px] text-muted-foreground tabular-nums">{Math.round(node.strength * 100)}%</span>
                     </div>
                   )}
-                  {node.relatedPostIds.length > 0 && node.relatedPostIds.map((pid) => (
+                  {node.relatedPostIds.length > 0 && (
                     <button
-                      key={pid}
-                      onClick={() => switchToThread(pid)}
+                      onClick={() => switchToThread(node.relatedPostIds[0])}
                       className="inline-flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary font-medium transition-colors"
                     >
-                      <ExternalLink className="h-2.5 w-2.5" />{pid}
+                      <ExternalLink className="h-2.5 w-2.5" />view post{node.relatedPostIds.length > 1 ? ` +${node.relatedPostIds.length - 1}` : ''}
                     </button>
-                  ))}
+                  )}
                 </div>
               </div>
 
