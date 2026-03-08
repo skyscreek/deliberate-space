@@ -218,8 +218,9 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
     canvas.height = dimensions.height * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Background
-    ctx.fillStyle = 'hsl(220, 15%, 8%)';
+    // Background — detect dark mode
+    const isDark = document.documentElement.classList.contains('dark');
+    ctx.fillStyle = isDark ? 'hsl(220, 15%, 8%)' : 'hsl(220, 15%, 96%)';
     ctx.fillRect(0, 0, dimensions.width, dimensions.height);
 
     ctx.save();
