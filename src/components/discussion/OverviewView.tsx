@@ -99,6 +99,7 @@ function StatItem({ label, value }: { label: string; value: number | string }) {
 
 export default function OverviewView({ topic, onSwitchToThread }: Props) {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
+  const [highlightedType, setHighlightedType] = useState<string | null>(null);
 
   const argCounts = useMemo(() => {
     const counts: Record<string, number> = {};
