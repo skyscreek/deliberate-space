@@ -86,14 +86,14 @@ async function fetchTopicBySlug(slug: string): Promise<TopicRow> {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, avatar_url')
+    .select('display_name, avatar_url, username')
     .eq('user_id', data.author_id)
     .single();
 
   return {
     ...data,
     slug: data.slug ?? '',
-    author_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+    author_profile: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url, username: profile.username } : undefined,
   };
 }
 
