@@ -298,7 +298,58 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       },
     });
 
-    // ─── Sigma ───
+    // Custom label draw — no background box, text shadow for readability
+    function drawNodeLabel(
+      context: CanvasRenderingContext2D,
+      data: any,
+      settings: any,
+    ) {
+      if (!data.label) return;
+      const size = settings.labelSize;
+      const font = settings.labelFont;
+      const weight = settings.labelWeight || '500';
+      context.font = `${weight} ${size}px ${font}`;
+      context.fillStyle = (data as any).forceLabel
+        ? 'hsla(220, 10%, 88%, 0.95)'
+        : 'hsla(220, 10%, 75%, 0.75)';
+      context.shadowColor = 'hsla(222, 10%, 5%, 0.9)';
+      context.shadowBlur = 5;
+      context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
+      context.shadowColor = 'transparent';
+      context.shadowBlur = 0;
+    }
+
+    // Custom hover draw — dark background instead of white
+    function drawNodeHover(
+      context: CanvasRenderingContext2D,
+      data: any,
+      settings: any,
+    ) {
+      const size = settings.labelSize + 2;
+      const font = settings.labelFont;
+      const weight = '600';
+      const label = data.label || '';
+      if (!label) return;
+      context.font = `${weight} ${size}px ${font}`;
+      const textWidth = context.measureText(label).width;
+      const padding = 6;
+      const x = data.x + data.size + 3;
+      const y = data.y - size / 2 - padding;
+      // Dark rounded background
+      const radius = 4;
+      context.fillStyle = 'hsla(222, 10%, 12%, 0.92)';
+      context.beginPath();
+      context.roundRect(x - padding, y, textWidth + padding * 2, size + padding * 2, radius);
+      context.fill();
+      context.strokeStyle = 'hsla(222, 8%, 30%, 0.4)';
+      context.lineWidth = 1;
+      context.stroke();
+      // Text
+      context.fillStyle = 'hsla(220, 10%, 92%, 0.95)';
+      context.fillText(label, x, data.y + size / 3);
+    }
+
+
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
       enableEdgeEvents: false,
@@ -307,6 +358,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
       labelSize: 11,
       labelWeight: '500',
       labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
+      defaultDrawNodeLabel: drawNodeLabel,
+      defaultDrawNodeHover: drawNodeHover,
       stagePadding: 60,
       labelRenderedSizeThreshold: 7,
       defaultNodeColor: '#556677',
