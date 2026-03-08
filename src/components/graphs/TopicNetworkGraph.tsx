@@ -569,10 +569,24 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         </div>
       )}
 
-      {/* ── Bottom-left: cluster legend + bridge opportunities ── */}
-      <div className="absolute bottom-4 left-4 z-20 max-w-[280px] space-y-2">
-        {/* Bridge opportunities */}
-        {gaps.length > 0 && !selectedNodeData && (
+      {/* ── Bottom-left: cluster legend only ── */}
+      <div className="absolute bottom-4 left-4 z-10">
+        <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
+          style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
+          {clusters.map(c => (
+            <button key={c.id} onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}
+              className="flex items-center gap-2 text-[10px] w-full text-left rounded px-1 -mx-1 transition-colors hover:bg-white/5">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
+              <span className="font-medium" style={{ color: TEXT_MED }}>{c.label}</span>
+              <span className="ml-auto" style={{ color: TEXT_DIM }}>{c.nodeCount}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Bottom-right: bridge opportunities OR selected node card ── */}
+      {gaps.length > 0 && !selectedNodeData && (
+        <div className="absolute bottom-4 right-4 z-20 max-w-[280px]">
           <div className="rounded-xl p-3 space-y-2.5 backdrop-blur-md" style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
               <Sparkles className="h-3 w-3" style={{ color: '#e8b832aa' }} /> Bridge opportunities
@@ -591,21 +605,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               </button>
             ))}
           </div>
-        )}
-
-        {/* Cluster legend — always visible */}
-        <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
-          style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
-          {clusters.map(c => (
-            <button key={c.id} onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}
-              className="flex items-center gap-2 text-[10px] w-full text-left rounded px-1 -mx-1 transition-colors hover:bg-white/5">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
-              <span className="font-medium" style={{ color: TEXT_MED }}>{c.label}</span>
-              <span className="ml-auto" style={{ color: TEXT_DIM }}>{c.nodeCount}</span>
-            </button>
-          ))}
         </div>
-      </div>
+      )}
 
       {/* ── Selected node card — bottom-right ── */}
       {selectedNodeData && (
