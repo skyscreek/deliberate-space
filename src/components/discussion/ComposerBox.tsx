@@ -11,7 +11,7 @@ const guidanceIcons: Record<string, typeof Lightbulb> = {
   'evidence-needed': Search,
   'missing-perspective': Eye,
   gap: Lightbulb,
-  'missing-counterargument': MessageSquareWarning,
+  'missing-counterargument': MessageSquare,
   'missing-alternative': ArrowRightLeft,
   'unresolved-question': HelpCircle,
 };
