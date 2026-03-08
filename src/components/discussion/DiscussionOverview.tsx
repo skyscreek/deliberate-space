@@ -185,6 +185,7 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+      )}
     </div>
   );
 }
