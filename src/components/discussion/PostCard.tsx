@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Post, Reply, ArgdownType } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
-import { ChevronUp, ChevronDown, MessageSquare, CornerDownRight, X, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, MessageSquare, CornerDownRight, X, Minus, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
@@ -38,6 +38,32 @@ function Avatar({ name, color, size = 'md' }: { name: string; color: string; siz
     >
       {initials}
     </div>
+  );
+}
+
+/** Reddit-style collapse toggle */
+function CollapseToggle({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center h-5 w-5 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors shrink-0"
+      aria-label={collapsed ? 'Expand' : 'Collapse'}
+    >
+      {collapsed ? <Plus className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+    </button>
+  );
+}
+
+/** Clickable vertical thread line */
+function ThreadLine({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex justify-center w-5 shrink-0 cursor-pointer py-1"
+      aria-label="Collapse thread"
+    >
+      <div className="w-0.5 h-full bg-border group-hover:bg-foreground/40 transition-colors rounded-full" />
+    </button>
   );
 }
 
@@ -100,49 +126,81 @@ function ReplyBranch({ reply, depth = 0 }: { reply: Reply; depth?: number }) {
     if (isReplying) clearReply(); else startReply(reply.id, reply.author.name, reply.content);
   };
 
+  const totalDescendants = (r: Reply): number => {
+    if (!r.replies) return 0;
+    return r.replies.reduce((sum, child) => sum + 1 + totalDescendants(child), 0);
+  };
+
   return (
-    <div className={cn('relative', depth > 0 && 'ml-5')}>
-      {depth > 0 && <div className="absolute left-[-12px] top-0 bottom-0 w-px bg-thread-line" />}
-
-      <div className="flex gap-2.5 py-2">
-        <Avatar name={reply.author.name} color={reply.author.color} size="sm" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="font-semibold text-foreground">{reply.author.name}</span>
-            <ArgdownHint type={reply.argdownType} />
-            <span className="text-muted-foreground">· {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+    <div className="flex gap-0">
+      {/* Left column: toggle or thread line */}
+      <div className="flex flex-col items-center">
+        {collapsed ? (
+          <div className="pt-1.5">
+            <CollapseToggle collapsed onClick={() => setCollapsed(false)} />
           </div>
-
-          <p className="mt-1 text-sm leading-relaxed text-foreground/90">{reply.content}</p>
-
-          <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-0.5">
-              <button className="hover:text-vote-up transition-colors"><ChevronUp className="h-3.5 w-3.5" /></button>
-              <span className="font-semibold text-foreground/70 tabular-nums text-[11px]">{reply.score}</span>
-              <button className="hover:text-vote-down transition-colors"><ChevronDown className="h-3.5 w-3.5" /></button>
+        ) : (
+          <>
+            <div className="pt-1.5">
+              <Avatar name={reply.author.name} color={reply.author.color} size="sm" />
             </div>
-            <button onClick={handleReply} className={cn('hover:text-foreground transition-colors font-medium', isReplying && 'text-primary')}>Reply</button>
             {hasChildren && (
-              <button onClick={() => setCollapsed(!collapsed)} className="text-primary/60 hover:text-primary font-medium">
-                {collapsed ? `+${reply.replies!.length} replies` : '−'}
-              </button>
+              <ThreadLine onClick={() => setCollapsed(true)} />
             )}
-          </div>
-
-          {isReplying && (
-            <InlineComposer
-              replyToAuthor={reply.author.name}
-              replyToExcerpt={reply.content}
-              assistedComment={assistedComment?.replyToPostId === reply.id ? assistedComment : null}
-              onClose={clearReply}
-            />
-          )}
-        </div>
+          </>
+        )}
       </div>
 
-      {hasChildren && !collapsed && (
-        <div>{reply.replies!.map((child) => <ReplyBranch key={child.id} reply={child} depth={depth + 1} />)}</div>
-      )}
+      {/* Right column: content */}
+      <div className="flex-1 min-w-0 pl-2">
+        {collapsed ? (
+          /* Collapsed single-line summary */
+          <button
+            onClick={() => setCollapsed(false)}
+            className="flex items-center gap-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="font-semibold text-foreground/70">{reply.author.name}</span>
+            <span>· {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+            {hasChildren && <span className="text-primary/60 font-medium">+{totalDescendants(reply) + 1} comments</span>}
+          </button>
+        ) : (
+          <>
+            <div className="py-1.5">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-semibold text-foreground">{reply.author.name}</span>
+                <ArgdownHint type={reply.argdownType} />
+                <span className="text-muted-foreground">· {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+              </div>
+
+              <p className="mt-1 text-sm leading-relaxed text-foreground/90">{reply.content}</p>
+
+              <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-0.5">
+                  <button className="hover:text-vote-up transition-colors"><ChevronUp className="h-3.5 w-3.5" /></button>
+                  <span className="font-semibold text-foreground/70 tabular-nums text-[11px]">{reply.score}</span>
+                  <button className="hover:text-vote-down transition-colors"><ChevronDown className="h-3.5 w-3.5" /></button>
+                </div>
+                <button onClick={handleReply} className={cn('hover:text-foreground transition-colors font-medium', isReplying && 'text-primary')}>Reply</button>
+              </div>
+
+              {isReplying && (
+                <InlineComposer
+                  replyToAuthor={reply.author.name}
+                  replyToExcerpt={reply.content}
+                  assistedComment={assistedComment?.replyToPostId === reply.id ? assistedComment : null}
+                  onClose={clearReply}
+                />
+              )}
+            </div>
+
+            {hasChildren && (
+              <div>
+                {reply.replies!.map((child) => <ReplyBranch key={child.id} reply={child} depth={depth + 1} />)}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -151,7 +209,6 @@ export default function PostCard({ post }: { post: Post }) {
   const { highlightedPostIds, activeFilter, scrollToPostId, clearScrollTarget, startReply, replyingToPostId, assistedComment, clearReply } = useDiscussion();
   const ref = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const [showReplies, setShowReplies] = useState(post.replies.length <= 2);
 
   const isHighlighted = highlightedPostIds.includes(post.id);
   const isDimmed = activeFilter !== null && !isHighlighted;
@@ -162,13 +219,15 @@ export default function PostCard({ post }: { post: Post }) {
       ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
       clearScrollTarget();
       setCollapsed(false);
-      setShowReplies(true);
     }
   }, [scrollToPostId, post.id, clearScrollTarget]);
 
   const handleReply = () => {
     if (isReplying) clearReply(); else startReply(post.id, post.author.name, post.content);
   };
+
+  const totalReplies = (replies: Reply[]): number =>
+    replies.reduce((sum, r) => sum + 1 + totalReplies(r.replies || []), 0);
 
   return (
     <div
@@ -181,78 +240,85 @@ export default function PostCard({ post }: { post: Post }) {
       )}
     >
       <div className="p-4 sm:p-5">
-        {/* Author line + collapse toggle */}
-        <div className="flex items-start gap-3">
-          <Avatar name={post.author.name} color={post.author.color} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-foreground">{post.author.name}</span>
-              <ArgdownHint type={post.argdownType} />
-              {post.author.role && <span className="text-xs text-muted-foreground">{post.author.role}</span>}
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-            </span>
+        {/* Top-level post uses same layout pattern */}
+        <div className="flex gap-0">
+          {/* Left column */}
+          <div className="flex flex-col items-center">
+            {collapsed ? (
+              <div className="pt-0.5">
+                <CollapseToggle collapsed onClick={() => setCollapsed(false)} />
+              </div>
+            ) : (
+              <>
+                <Avatar name={post.author.name} color={post.author.color} />
+                {post.replies.length > 0 && (
+                  <ThreadLine onClick={() => setCollapsed(true)} />
+                )}
+              </>
+            )}
           </div>
 
-          {/* Vote + collapse */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-0.5 text-muted-foreground">
-              <button className="hover:text-vote-up transition-colors"><ChevronUp className="h-4 w-4" /></button>
-              <span className="text-xs font-bold text-foreground/70 tabular-nums">{post.score}</span>
-              <button className="hover:text-vote-down transition-colors"><ChevronDown className="h-4 w-4" /></button>
-            </div>
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
-              <ChevronRight className={cn('h-4 w-4 transition-transform', !collapsed && 'rotate-90')} />
-            </button>
+          {/* Right column */}
+          <div className="flex-1 min-w-0 pl-2.5">
+            {collapsed ? (
+              /* Collapsed: single line with author, time, reply count */
+              <button
+                onClick={() => setCollapsed(false)}
+                className="flex items-center gap-2 py-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="font-semibold text-foreground/70">{post.author.name}</span>
+                <span>· {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</span>
+                {post.replies.length > 0 && (
+                  <span className="text-primary/60 font-medium">+{totalReplies(post.replies)} comments</span>
+                )}
+              </button>
+            ) : (
+              <>
+                {/* Author line */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-foreground">{post.author.name}</span>
+                  <ArgdownHint type={post.argdownType} />
+                  {post.author.role && <span className="text-xs text-muted-foreground">{post.author.role}</span>}
+                  <span className="text-xs text-muted-foreground">
+                    · {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-sm leading-relaxed text-foreground/90">{post.content}</p>
+
+                <div className="mt-2.5 flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-0.5">
+                    <button className="hover:text-vote-up transition-colors"><ChevronUp className="h-3.5 w-3.5" /></button>
+                    <span className="text-xs font-bold text-foreground/70 tabular-nums">{post.score}</span>
+                    <button className="hover:text-vote-down transition-colors"><ChevronDown className="h-3.5 w-3.5" /></button>
+                  </div>
+                  <button
+                    onClick={handleReply}
+                    className={cn('font-medium hover:text-foreground transition-colors flex items-center gap-1', isReplying && 'text-primary')}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Reply
+                  </button>
+                </div>
+
+                {isReplying && (
+                  <InlineComposer
+                    replyToAuthor={post.author.name}
+                    replyToExcerpt={post.content}
+                    assistedComment={assistedComment?.targetPostId === post.id || assistedComment?.replyToPostId === post.id ? assistedComment : null}
+                    onClose={clearReply}
+                  />
+                )}
+
+                {post.replies.length > 0 && (
+                  <div className="mt-3">
+                    {post.replies.map((reply) => <ReplyBranch key={reply.id} reply={reply} depth={0} />)}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-
-        {!collapsed && (
-          <>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/90">{post.content}</p>
-
-            <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-              <button
-                onClick={() => setShowReplies(!showReplies)}
-                className="flex items-center gap-1.5 font-medium hover:text-foreground transition-colors"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                {post.replies.length > 0
-                  ? `${post.replies.length} ${post.replies.length === 1 ? 'reply' : 'replies'}`
-                  : 'No replies'}
-              </button>
-              <button
-                onClick={handleReply}
-                className={cn('font-medium hover:text-foreground transition-colors', isReplying && 'text-primary')}
-              >
-                Reply
-              </button>
-            </div>
-
-            {isReplying && (
-              <InlineComposer
-                replyToAuthor={post.author.name}
-                replyToExcerpt={post.content}
-                assistedComment={assistedComment?.targetPostId === post.id || assistedComment?.replyToPostId === post.id ? assistedComment : null}
-                onClose={clearReply}
-              />
-            )}
-
-            {showReplies && post.replies.length > 0 && (
-              <div className="mt-3 ml-1 border-l-2 border-thread-line pl-4">
-                {post.replies.map((reply) => <ReplyBranch key={reply.id} reply={reply} depth={0} />)}
-              </div>
-            )}
-          </>
-        )}
-
-        {collapsed && (
-          <p className="mt-2 text-xs text-muted-foreground line-clamp-1">{post.content}</p>
-        )}
       </div>
     </div>
   );
