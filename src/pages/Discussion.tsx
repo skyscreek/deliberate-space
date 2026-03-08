@@ -9,6 +9,7 @@ import ComposerBox from '@/components/discussion/ComposerBox';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
 import OverviewView from '@/components/discussion/OverviewView';
 import { ArrowLeft, MessageSquare, GitBranch, BarChart3, Sparkles } from 'lucide-react';
+import UserMenu from '@/components/UserMenu';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,7 @@ export default function Discussion() {
               <Sparkles className="h-4 w-4 text-primary" />
               <span className="font-semibold text-sm text-foreground">Delibera</span>
             </Link>
+            <div className="ml-auto"><UserMenu /></div>
           </div>
         </header>
 
