@@ -1,17 +1,17 @@
 import { DiscussionSummaryData, Tension, OpenQuestion, GuidanceItem } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
-import { Sparkles, Swords, HelpCircle, Lightbulb, Compass, ArrowRight, FileText } from 'lucide-react';
+import { Sparkles, ChevronDown } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 
-const guidanceTypeConfig: Record<string, { emoji: string; verb: string }> = {
-  'evidence-needed': { emoji: '📊', verb: 'Add evidence' },
-  'missing-perspective': { emoji: '👥', verb: 'Share perspective' },
-  gap: { emoji: '💡', verb: 'Explore gap' },
-  'missing-counterargument': { emoji: '⚖️', verb: 'Add counterargument' },
-  'missing-alternative': { emoji: '🔄', verb: 'Propose alternative' },
-  'unresolved-question': { emoji: '❓', verb: 'Help resolve' },
-  overrepresented: { emoji: '⚠️', verb: 'Well covered' },
+const guidanceTypeConfig: Record<string, { verb: string }> = {
+  'evidence-needed': { verb: 'Add evidence' },
+  'missing-perspective': { verb: 'Share perspective' },
+  gap: { verb: 'Explore gap' },
+  'missing-counterargument': { verb: 'Add counterargument' },
+  'missing-alternative': { verb: 'Propose alternative' },
+  'unresolved-question': { verb: 'Help resolve' },
+  overrepresented: { verb: 'Well covered' },
 };
 
 interface Props {
@@ -25,9 +25,11 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
   const { activeFilter, setFilter, scrollToPost, startAssistedComment } = useDiscussion();
 
   const handleContribute = (item: GuidanceItem) => {
+    // This scrolls to the target post AND opens the inline composer there
     startAssistedComment({
       guidanceId: item.id,
       targetPostId: item.targetPostId,
+      replyToPostId: item.targetPostId,
       label: item.label,
       description: item.description,
       suggestedArgdownType: item.suggestedArgdownType,
@@ -38,35 +40,29 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
 
   return (
     <div className="surface-card overflow-hidden">
-      {/* Static header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40">
-        <Sparkles className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-semibold text-foreground">Discussion Insights</span>
-        <span className="text-[10px] text-muted-foreground/60 bg-accent px-1.5 py-0.5 rounded-full">AI-generated</span>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
+        <Sparkles className="h-3 w-3 text-primary/60" />
+        <span className="text-[11px] font-medium text-muted-foreground">Discussion Insights</span>
+        <span className="text-[9px] text-muted-foreground/40 bg-accent/60 px-1.5 py-0.5 rounded-full">AI</span>
       </div>
 
-      <Accordion type="multiple" defaultValue={["summary"]} className="divide-y divide-border/30">
-        {/* Summary — open by default */}
+      <Accordion type="multiple" defaultValue={["summary"]} className="divide-y divide-border/20">
+        {/* Summary */}
         <AccordionItem value="summary" className="border-0">
-          <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
-            <div className="flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-semibold uppercase tracking-wider text-muted-foreground">Summary</span>
-            </div>
+          <AccordionTrigger className="px-3 py-2 text-[11px] hover:no-underline hover:bg-accent/20">
+            <span className="font-medium text-muted-foreground">Summary</span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3">
-            <p className="text-sm leading-relaxed text-foreground/85">{summary.text}</p>
+          <AccordionContent className="px-3 pb-2.5">
+            <p className="text-[13px] leading-relaxed text-foreground/80">{summary.text}</p>
             {summary.positions.length > 0 && (
-              <div className="mt-3 space-y-1">
-                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">Key positions</span>
-                {summary.positions.slice(0, 4).map((p, i) => (
+              <div className="mt-2 space-y-0.5">
+                {summary.positions.slice(0, 4).map((p) => (
                   <button
                     key={p.postId}
                     onClick={() => scrollToPost(p.postId)}
-                    className="w-full text-left flex items-start gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent/40 transition-colors group"
+                    className="w-full text-left text-[11px] text-muted-foreground/60 hover:text-foreground px-2 py-1 rounded hover:bg-accent/30 transition-colors"
                   >
-                    <span className="text-[9px] font-bold text-primary/50 mt-0.5 tabular-nums w-3 shrink-0">{i + 1}</span>
-                    <span className="text-foreground/70"><strong className="text-foreground">{p.authorName}</strong> — {p.position.length > 80 ? p.position.slice(0, 80) + '…' : p.position}</span>
+                    <span className="text-foreground/70 font-medium">{p.authorName}</span> — {p.position.length > 70 ? p.position.slice(0, 70) + '…' : p.position}
                   </button>
                 ))}
               </div>
@@ -76,14 +72,10 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
 
         {/* Key Tensions */}
         <AccordionItem value="tensions" className="border-0">
-          <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
-            <div className="flex items-center gap-1.5">
-              <Swords className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-semibold uppercase tracking-wider text-muted-foreground">Key Tensions</span>
-              <span className="text-[10px] text-muted-foreground/40 ml-1 normal-case tracking-normal">{tensions.length}</span>
-            </div>
+          <AccordionTrigger className="px-3 py-2 text-[11px] hover:no-underline hover:bg-accent/20">
+            <span className="font-medium text-muted-foreground">Key Tensions <span className="text-muted-foreground/30 ml-1">{tensions.length}</span></span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3 space-y-1.5">
+          <AccordionContent className="px-3 pb-2.5 space-y-1">
             {tensions.map((t) => {
               const isActive = activeFilter?.type === 'tension' && activeFilter.id === t.id;
               return (
@@ -91,12 +83,12 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
                   key={t.id}
                   onClick={() => isActive ? setFilter(null) : setFilter({ type: 'tension', id: t.id, relatedPostIds: t.relatedPostIds })}
                   className={cn(
-                    'w-full text-left rounded px-2.5 py-2 text-xs transition-all hover:bg-accent/40',
-                    isActive && 'ring-1 ring-highlight/60 bg-highlight-bg',
+                    'w-full text-left rounded px-2 py-1.5 text-[11px] transition-all hover:bg-accent/30',
+                    isActive && 'ring-1 ring-highlight/40 bg-highlight-bg',
                   )}
                 >
-                  <span className="font-medium text-foreground leading-snug block">{t.label}</span>
-                  <span className="text-muted-foreground/50 text-[10px] mt-0.5 block">{t.relatedPostIds.length} posts · click to highlight</span>
+                  <span className="text-foreground/80 block leading-snug">{t.label}</span>
+                  <span className="text-muted-foreground/40 text-[10px]">{t.relatedPostIds.length} posts</span>
                 </button>
               );
             })}
@@ -105,22 +97,18 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
 
         {/* Open Questions */}
         <AccordionItem value="questions" className="border-0">
-          <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
-            <div className="flex items-center gap-1.5">
-              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="font-semibold uppercase tracking-wider text-muted-foreground">Open Questions</span>
-              <span className="text-[10px] text-muted-foreground/40 ml-1 normal-case tracking-normal">{openQuestions.length}</span>
-            </div>
+          <AccordionTrigger className="px-3 py-2 text-[11px] hover:no-underline hover:bg-accent/20">
+            <span className="font-medium text-muted-foreground">Open Questions <span className="text-muted-foreground/30 ml-1">{openQuestions.length}</span></span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3 space-y-1.5">
+          <AccordionContent className="px-3 pb-2.5 space-y-1">
             {openQuestions.map((q) => (
               <button
                 key={q.id}
                 onClick={() => scrollToPost(q.raisedInPostId)}
-                className="w-full text-left rounded px-2.5 py-2 text-xs hover:bg-accent/40 transition-colors"
+                className="w-full text-left rounded px-2 py-1.5 text-[11px] hover:bg-accent/30 transition-colors"
               >
-                <span className="text-foreground/80 leading-snug block">{q.question}</span>
-                {q.raisedBy && <span className="text-muted-foreground/50 text-[10px] mt-0.5 block">— {q.raisedBy}</span>}
+                <span className="text-foreground/70 block leading-snug">{q.question}</span>
+                {q.raisedBy && <span className="text-muted-foreground/40 text-[10px]">— {q.raisedBy}</span>}
               </button>
             ))}
           </AccordionContent>
@@ -129,22 +117,18 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
         {/* Emerging Proposals */}
         {summary.emergingProposals.length > 0 && (
           <AccordionItem value="proposals" className="border-0">
-            <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">
-              <div className="flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-semibold uppercase tracking-wider text-muted-foreground">Emerging Proposals</span>
-                <span className="text-[10px] text-muted-foreground/40 ml-1 normal-case tracking-normal">{summary.emergingProposals.length}</span>
-              </div>
+            <AccordionTrigger className="px-3 py-2 text-[11px] hover:no-underline hover:bg-accent/20">
+              <span className="font-medium text-muted-foreground">Emerging Proposals <span className="text-muted-foreground/30 ml-1">{summary.emergingProposals.length}</span></span>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-3 space-y-1.5">
+            <AccordionContent className="px-3 pb-2.5 space-y-1">
               {summary.emergingProposals.map((ep) => (
                 <button
                   key={ep.id}
                   onClick={() => ep.relatedPostIds[0] && scrollToPost(ep.relatedPostIds[0])}
-                  className="w-full text-left rounded px-2.5 py-2 text-xs hover:bg-accent/40 transition-colors group"
+                  className="w-full text-left rounded px-2 py-1.5 text-[11px] hover:bg-accent/30 transition-colors"
                 >
-                  <span className="font-medium text-foreground block">{ep.title}</span>
-                  <span className="text-muted-foreground/70 block mt-0.5">{ep.description}</span>
+                  <span className="font-medium text-foreground/80 block">{ep.title}</span>
+                  <span className="text-muted-foreground/50 block mt-0.5">{ep.description}</span>
                 </button>
               ))}
             </AccordionContent>
@@ -153,30 +137,25 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
 
         {/* Where to Contribute */}
         <AccordionItem value="contribute" className="border-0">
-          <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-primary/[0.03]">
-            <div className="flex items-center gap-1.5">
-              <Compass className="h-3.5 w-3.5 text-primary" />
-              <span className="font-semibold uppercase tracking-wider text-primary/70">Where to Contribute</span>
-              <span className="text-[10px] text-muted-foreground/40 ml-1 normal-case tracking-normal">{actionableGuidance.length}</span>
-            </div>
+          <AccordionTrigger className="px-3 py-2 text-[11px] hover:no-underline hover:bg-accent/20">
+            <span className="font-medium text-primary/70">Where to Contribute <span className="text-muted-foreground/30 ml-1">{actionableGuidance.length}</span></span>
           </AccordionTrigger>
-          <AccordionContent className="px-4 pb-3">
-            <p className="text-[11px] text-muted-foreground/60 mb-2">Click to jump to the relevant part and start writing with context.</p>
-            <div className="space-y-1">
+          <AccordionContent className="px-3 pb-2.5">
+            <p className="text-[10px] text-muted-foreground/40 mb-1.5">Click to jump to the relevant place and start contributing.</p>
+            <div className="space-y-0.5">
               {actionableGuidance.map((item) => {
-                const config = guidanceTypeConfig[item.type] || { emoji: '💬', verb: 'Contribute' };
+                const config = guidanceTypeConfig[item.type] || { verb: 'Contribute' };
                 return (
                   <button
                     key={item.id}
                     onClick={() => handleContribute(item)}
-                    className="group w-full text-left flex items-start gap-2 rounded px-2.5 py-2 text-xs transition-all hover:bg-primary/5"
+                    className="w-full text-left flex items-start gap-2 rounded px-2 py-1.5 text-[11px] transition-all hover:bg-primary/5 group"
                   >
-                    <span className="text-sm shrink-0 mt-px">{config.emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium text-foreground">{item.label}</span>
-                      <p className="text-muted-foreground/70 mt-0.5 leading-snug">{item.description}</p>
+                      <span className="text-foreground/80 font-medium block">{item.label}</span>
+                      <span className="text-muted-foreground/50 block leading-snug">{item.description}</span>
                     </div>
-                    <ArrowRight className="h-3 w-3 text-muted-foreground/0 group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+                    <span className="text-[10px] text-primary/50 group-hover:text-primary shrink-0 mt-0.5 transition-colors">{config.verb} →</span>
                   </button>
                 );
               })}
