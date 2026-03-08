@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TopicMeta } from '@/types/discussion';
 import { Users, MessageSquare, Clock, ChevronDown, Search } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,10 +21,10 @@ export default function TopicHeader({ topic }: { topic: TopicMeta }) {
       <div className="space-y-2.5">
         {/* Category + status row */}
         <div className="flex items-center gap-2.5 text-xs">
-          <button className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-semibold">
+          <Link to={`/category/${topic.category.toLowerCase().replace(/\s+/g, '-')}`} className="inline-flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-semibold text-xs">
             <Search className="h-3 w-3" />
             {topic.category}
-          </button>
+          </Link>
           <span className="text-border">·</span>
           <span className={cn('text-xs', status.className)}>{status.label}</span>
         </div>
