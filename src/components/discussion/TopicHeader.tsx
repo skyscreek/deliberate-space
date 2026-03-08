@@ -29,8 +29,14 @@ export default function TopicHeader({ topic }: { topic: TopicMeta }) {
           <span className={cn('text-xs', status.className)}>{status.label}</span>
         </div>
 
-        {/* Title — strong focal point */}
-        <h1 className="text-xl font-bold tracking-tight text-foreground leading-snug">{topic.title}</h1>
+        {/* Title + collapse toggle */}
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-xl font-bold tracking-tight text-foreground leading-snug">{topic.title}</h1>
+          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-1">
+            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+            {open ? 'Hide' : 'Show'}
+          </CollapsibleTrigger>
+        </div>
 
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -47,12 +53,6 @@ export default function TopicHeader({ topic }: { topic: TopicMeta }) {
           <span className="flex items-center gap-1"><Users className="h-3 w-3" />{topic.participantCount}</span>
           <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{topic.postCount} posts</span>
         </div>
-
-        {/* Collapsible prompt */}
-        <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-0.5">
-          <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
-          {open ? 'Hide topic' : 'Show topic'}
-        </CollapsibleTrigger>
 
         <CollapsibleContent>
           <div className="surface-card-elevated px-4 py-3.5 mt-1">
