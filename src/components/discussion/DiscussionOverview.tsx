@@ -175,7 +175,7 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
             </span>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="space-y-2">
               {tensions.map((t) => {
                 const isActive = activeFilter?.type === 'tension' && activeFilter.id === t.id;
                 return (
