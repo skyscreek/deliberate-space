@@ -452,18 +452,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         background: CANVAS_BG,
       }} />
 
-      {/* ── Top bar ── */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 py-2 pointer-events-none">
-        <div className="flex items-center gap-1.5 pointer-events-auto rounded-full px-3 py-1.5" style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
-          {clusters.map(c => (
-            <button key={c.id} className="flex items-center gap-1 group" title={`${c.label} — ${c.nodeCount} topics`}
-              onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}>
-              <span className="w-2.5 h-2.5 rounded-full shrink-0 group-hover:scale-125 transition-transform" style={{ background: c.color }} />
-              <span className="text-[10px] hidden sm:inline transition-colors" style={{ color: TEXT_DIM }}>{c.label}</span>
-            </button>
-          ))}
-        </div>
-
+      {/* ── Top bar — search + expand only ── */}
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end px-3 py-2 pointer-events-none">
         <div className="flex items-center gap-1.5 pointer-events-auto">
           <span className="text-[9px] mr-1 hidden sm:inline" style={{ color: TEXT_DIM }}>scroll · drag · dblclick</span>
           <div className="relative">
