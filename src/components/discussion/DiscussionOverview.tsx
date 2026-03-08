@@ -24,6 +24,7 @@ interface Props {
 
 export default function DiscussionOverview({ summary, tensions, openQuestions, guidance }: Props) {
   const { activeFilter, setFilter, scrollToPost, startAssistedComment } = useDiscussion();
+  const [open, setOpen] = useState(true);
 
   const handleContribute = (item: GuidanceItem) => {
     startAssistedComment({
