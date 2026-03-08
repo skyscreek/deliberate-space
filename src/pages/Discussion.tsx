@@ -294,7 +294,7 @@ function TopLevelComposer({ topicId }: { topicId: string }) {
   );
 }
 
-function TopicHeaderLive({ topic }: { topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_profile?: { display_name: string }; created_at: string; post_count?: number; participant_count?: number } }) {
+function TopicHeaderLive({ topic }: { topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string }; created_at: string; post_count?: number; participant_count?: number } }) {
   const [open, setOpen] = useState(true);
   const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'text-vote-up font-semibold' },
