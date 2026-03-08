@@ -22,6 +22,30 @@ interface Props {
   guidance: GuidanceItem[];
 }
 
+/** Renders summary text with inline [linked references](@postId) */
+function SummaryText({ text, onClickRef }: { text: string; onClickRef: (postId: string) => void }) {
+  const parts = text.split(/(\[[^\]]+\]\(@[^)]+\))/g);
+  return (
+    <p className="text-sm leading-relaxed text-foreground/85">
+      {parts.map((part, i) => {
+        const match = part.match(/^\[([^\]]+)\]\(@([^)]+)\)$/);
+        if (match) {
+          return (
+            <button
+              key={i}
+              onClick={() => onClickRef(match[2])}
+              className="text-primary/80 hover:text-primary underline underline-offset-2 decoration-primary/30 hover:decoration-primary/60 transition-colors"
+            >
+              {match[1]}
+            </button>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </p>
+  );
+}
+
 export default function DiscussionOverview({ summary, tensions, openQuestions, guidance }: Props) {
   const { activeFilter, setFilter, scrollToPost, startAssistedComment } = useDiscussion();
   const [open, setOpen] = useState(true);
