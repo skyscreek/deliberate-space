@@ -9,7 +9,7 @@ import ThreadView from '@/components/discussion/ThreadView';
 import ComposerBox from '@/components/discussion/ComposerBox';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
 import DeliberationSidebar from '@/components/deliberation/DeliberationSidebar';
-import { ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch } from 'lucide-react';
+import { ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle } from '@/components/ui/sheet';
@@ -37,9 +37,7 @@ export default function Discussion() {
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
             <Link to="/" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-                <MessageSquare className="h-3.5 w-3.5 text-primary-foreground" />
-              </div>
+              <Sparkles className="h-5 w-5 text-primary" />
               <span className="font-bold text-sm text-foreground">Delibera</span>
             </Link>
 
