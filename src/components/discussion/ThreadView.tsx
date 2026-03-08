@@ -8,10 +8,10 @@ export default function ThreadView({ posts }: { posts: Post[] }) {
   const { activeFilter, setFilter } = useDiscussion();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {activeFilter && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50/60 dark:bg-amber-950/30 dark:border-amber-700 px-3 py-2 text-sm">
-          <span className="text-amber-800 dark:text-amber-200">
+        <div className="flex items-center gap-2 rounded-lg border border-highlight bg-highlight-bg px-3 py-2 text-sm shadow-sm">
+          <span className="text-foreground">
             Showing posts related to: <strong>{activeFilter.type}</strong> — {activeFilter.relatedPostIds.length} posts highlighted
           </span>
           <Button variant="ghost" size="sm" className="ml-auto h-6 w-6 p-0" onClick={() => setFilter(null)}>

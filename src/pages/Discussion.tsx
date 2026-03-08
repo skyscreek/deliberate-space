@@ -9,7 +9,7 @@ import ThreadView from '@/components/discussion/ThreadView';
 import ComposerBox from '@/components/discussion/ComposerBox';
 import ArgumentMapView from '@/components/discussion/ArgumentMapView';
 import DeliberationSidebar from '@/components/deliberation/DeliberationSidebar';
-import { Sparkles, ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch } from 'lucide-react';
+import { ArrowLeft, PanelRightOpen, X, MessageSquare, BarChart3, GitBranch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle } from '@/components/ui/sheet';
@@ -33,11 +33,13 @@ export default function Discussion() {
     <DiscussionProvider>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="border-b bg-card sticky top-0 z-30">
+        <header className="border-b bg-card sticky top-0 z-30 shadow-sm">
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
             <Link to="/" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              <Sparkles className="h-5 w-5 text-primary" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+                <MessageSquare className="h-3.5 w-3.5 text-primary-foreground" />
+              </div>
               <span className="font-bold text-sm text-foreground">Delibera</span>
             </Link>
 
@@ -46,11 +48,11 @@ export default function Discussion() {
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm" className="ml-auto lg:hidden">
                   <PanelRightOpen className="h-4 w-4 mr-1" />
-                  Clusters
+                  Insights
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-[300px] p-0">
-                <SheetTitle className="sr-only">Deliberation Panel</SheetTitle>
+                <SheetTitle className="sr-only">Discussion Insights</SheetTitle>
                 <div className="flex items-center justify-between border-b px-4 py-3">
                   <h2 className="text-sm font-semibold text-foreground">Discussion Insights</h2>
                   <SheetClose asChild>
@@ -68,14 +70,14 @@ export default function Discussion() {
         </header>
 
         <main className="mx-auto max-w-6xl px-4 py-6">
-          {/* Topic header + proposal — full width */}
-          <div className="max-w-3xl space-y-4 mb-4">
+          {/* Topic header + proposal */}
+          <div className="max-w-3xl space-y-4 mb-5">
             <TopicHeader topic={topic} />
             <ProposalPrompt text={topic.proposal} />
           </div>
 
-          {/* Discussion Overview — above thread, full main column width */}
-          <div className="max-w-3xl mb-4">
+          {/* Discussion Overview — above thread */}
+          <div className="max-w-3xl mb-5">
             <DiscussionOverview
               summary={topic.summary}
               tensions={topic.tensions}
@@ -84,8 +86,8 @@ export default function Discussion() {
           </div>
 
           {/* View tabs */}
-          <div className="max-w-3xl mb-4">
-            <div className="flex items-center gap-1 border-b">
+          <div className="max-w-3xl mb-5">
+            <div className="flex items-center gap-1 border-b border-border">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -93,10 +95,10 @@ export default function Discussion() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+                      'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
                       activeTab === tab.id
                         ? 'border-primary text-foreground'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -110,7 +112,7 @@ export default function Discussion() {
           {/* Two-column layout */}
           <div className="flex gap-6 items-start">
             {/* Main column */}
-            <div className="flex-1 min-w-0 max-w-3xl space-y-6">
+            <div className="flex-1 min-w-0 max-w-3xl space-y-4">
               {activeTab === 'thread' && (
                 <>
                   <ThreadView posts={topic.posts} />
@@ -122,7 +124,6 @@ export default function Discussion() {
                   <p className="text-sm text-muted-foreground">
                     A structured overview of the discussion showing all key positions, tensions, clusters, and emerging proposals in one place.
                   </p>
-                  {/* Reuse overview but always expanded */}
                   <DiscussionOverview
                     summary={topic.summary}
                     tensions={topic.tensions}
@@ -135,9 +136,9 @@ export default function Discussion() {
               )}
             </div>
 
-            {/* Sidebar — slim, supportive, desktop only */}
-            <aside className="hidden lg:block w-64 shrink-0 sticky top-20">
-              <div className="rounded-lg border bg-card/50 p-3">
+            {/* Sidebar — slim, supportive */}
+            <aside className="hidden lg:block w-60 shrink-0 sticky top-20">
+              <div className="rounded-lg border bg-card shadow-sm p-3 space-y-1">
                 <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Discussion Insights</h2>
                 <DeliberationSidebar topic={topic} />
               </div>
