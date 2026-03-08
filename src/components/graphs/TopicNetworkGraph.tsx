@@ -516,9 +516,10 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
         </div>
       )}
 
-      {/* ── Bridge opportunities — bottom-left ── */}
-      {gaps.length > 0 && !selectedNodeData && (
-        <div className="absolute bottom-4 left-4 z-20 max-w-[280px]">
+      {/* ── Bottom-left: cluster legend + bridge opportunities ── */}
+      <div className="absolute bottom-4 left-4 z-20 max-w-[280px] space-y-2">
+        {/* Bridge opportunities */}
+        {gaps.length > 0 && !selectedNodeData && (
           <div className="rounded-xl p-3 space-y-2.5 backdrop-blur-md" style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
               <Sparkles className="h-3 w-3" style={{ color: '#e8b832aa' }} /> Bridge opportunities
@@ -537,8 +538,21 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               </button>
             ))}
           </div>
+        )}
+
+        {/* Cluster legend — always visible */}
+        <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
+          style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
+          {clusters.map(c => (
+            <button key={c.id} onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}
+              className="flex items-center gap-2 text-[10px] w-full text-left rounded px-1 -mx-1 transition-colors hover:bg-white/5">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
+              <span className="font-medium" style={{ color: TEXT_MED }}>{c.label}</span>
+              <span className="ml-auto" style={{ color: TEXT_DIM }}>{c.nodeCount}</span>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* ── Selected node card — bottom-right ── */}
       {selectedNodeData && (
@@ -569,7 +583,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               </button>
             </div>
 
-            {/* Why it matters */}
             <div className="space-y-1">
               <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>Why it matters</span>
               <p className="text-[11px] leading-relaxed" style={{ color: TEXT_MED }}>
@@ -584,7 +597,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               </p>
             </div>
 
-            {/* Connected */}
             {selectedNodeData.neighborTitles.length > 0 && (
               <div className="space-y-1">
                 <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>Connected to</span>
@@ -603,7 +615,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               </div>
             )}
 
-            {/* Suggested new discussion */}
             {selectedNodeData.bridgedClusters.length > 0 && (
               <div className="rounded-lg px-3 py-2 space-y-1" style={{ background: 'hsla(45,80%,55%,0.06)', border: '1px solid hsla(45,80%,55%,0.1)' }}>
                 <span className="text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'hsla(45,80%,60%,0.6)' }}>
@@ -620,23 +631,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, onSel
               style={{ background: 'hsla(220,10%,30%,0.5)', color: TEXT_HI }}>
               Open Discussion <ExternalLink className="h-3 w-3" />
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Cluster legend — bottom-left fallback ── */}
-      {(
-        <div className="absolute bottom-4 left-4 z-10">
-          <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
-            style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
-            {clusters.map(c => (
-              <button key={c.id} onClick={() => c.nodeIds[0] && focusNode(c.nodeIds[0])}
-                className="flex items-center gap-2 text-[10px] w-full text-left rounded px-1 -mx-1 transition-colors hover:bg-white/5">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
-                <span className="font-medium" style={{ color: TEXT_MED }}>{c.label}</span>
-                <span className="ml-auto" style={{ color: TEXT_DIM }}>{c.nodeCount}</span>
-              </button>
-            ))}
           </div>
         </div>
       )}
