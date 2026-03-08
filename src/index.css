@@ -162,8 +162,4 @@
   .glass-subtle {
     @apply bg-card/50 backdrop-blur-sm border border-border/30 rounded-lg;
   }
-
-  .argdown-badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider;
-  }
 }

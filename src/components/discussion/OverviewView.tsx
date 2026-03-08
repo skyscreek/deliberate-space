@@ -1,203 +1,192 @@
-import { Topic } from '@/types/discussion';
-import { useDiscussion } from '@/context/DiscussionContext';
-import { Users, Swords, HelpCircle, Lightbulb, ArrowRight, FileText, TrendingUp, BarChart3 } from 'lucide-react';
+import { useMemo, useState, useCallback } from 'react';
+import { Topic, ArgumentNode } from '@/types/discussion';
 import { cn } from '@/lib/utils';
+import {
+  Shield, ThumbsUp, AlertTriangle, HelpCircle, Lightbulb,
+  ArrowRightLeft, Target, ExternalLink, Filter,
+} from 'lucide-react';
 
 interface Props {
   topic: Topic;
+  onSwitchToThread?: (postId: string) => void;
 }
 
-export default function OverviewView({ topic }: Props) {
-  const { activeFilter, setFilter, scrollToPost } = useDiscussion();
+const nodeColors: Record<string, { bg: string; border: string; text: string; icon: typeof Target }> = {
+  claim:       { bg: 'bg-argdown-claim/8',       border: 'border-argdown-claim/25',       text: 'text-argdown-claim',       icon: Target },
+  support:     { bg: 'bg-argdown-support/8',      border: 'border-argdown-support/25',     text: 'text-argdown-support',     icon: ThumbsUp },
+  objection:   { bg: 'bg-argdown-objection/8',    border: 'border-argdown-objection/25',   text: 'text-argdown-objection',   icon: Shield },
+  concern:     { bg: 'bg-argdown-concern/8',      border: 'border-argdown-concern/25',     text: 'text-argdown-concern',     icon: AlertTriangle },
+  alternative: { bg: 'bg-argdown-alternative/8',  border: 'border-argdown-alternative/25', text: 'text-argdown-alternative', icon: ArrowRightLeft },
+  question:    { bg: 'bg-argdown-question/8',     border: 'border-argdown-question/25',    text: 'text-argdown-question',    icon: HelpCircle },
+  proposal:    { bg: 'bg-argdown-proposal/8',     border: 'border-argdown-proposal/25',    text: 'text-argdown-proposal',    icon: Lightbulb },
+};
 
-  const { summary, tensions, openQuestions, clusters } = topic;
+type FilterType = 'all' | ArgumentNode['type'];
+
+/* Flat node for the visual map */
+interface FlatNode {
+  node: ArgumentNode;
+  depth: number;
+  parentId?: string;
+}
+
+function flattenNodes(nodes: ArgumentNode[], depth = 0, parentId?: string): FlatNode[] {
+  const result: FlatNode[] = [];
+  for (const node of nodes) {
+    result.push({ node, depth, parentId });
+    if (node.children.length > 0) {
+      result.push(...flattenNodes(node.children, depth + 1, node.id));
+    }
+  }
+  return result;
+}
+
+function NodeCard({ node, depth, onThreadRef }: { node: ArgumentNode; depth: number; onThreadRef: (postId: string) => void }) {
+  const style = nodeColors[node.type] || nodeColors.claim;
+  const Icon = style.icon;
+
+  return (
+    <div
+      className={cn(
+        'rounded-lg border px-3 py-2.5 transition-colors',
+        style.bg, style.border,
+      )}
+      style={{ marginLeft: `${depth * 24}px` }}
+    >
+      <div className="flex items-start gap-2">
+        <Icon className={cn('h-3.5 w-3.5 shrink-0 mt-0.5', style.text)} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={cn('text-[10px] font-medium uppercase tracking-wider', style.text)}>
+              {node.type}
+            </span>
+            {node.status && (
+              <span className={cn(
+                'text-[9px] rounded-full px-1.5 py-px',
+                node.status === 'resolved' && 'bg-argdown-support/10 text-argdown-support',
+                node.status === 'contested' && 'bg-argdown-objection/10 text-argdown-objection',
+                node.status === 'unresolved' && 'bg-argdown-question/10 text-argdown-question',
+                node.status === 'emerging' && 'bg-argdown-proposal/10 text-argdown-proposal',
+              )}>
+                {node.status}
+              </span>
+            )}
+            {node.author && <span className="text-[10px] text-muted-foreground/50">by {node.author}</span>}
+          </div>
+          <p className="text-xs text-foreground/85 leading-relaxed mt-1">{node.text}</p>
+
+          {node.strength != null && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <div className="flex-1 h-1 rounded-full bg-border/60 max-w-[60px]">
+                <div className="h-full rounded-full bg-argdown-support/50" style={{ width: `${Math.round(node.strength * 100)}%` }} />
+              </div>
+              <span className="text-[9px] text-muted-foreground/40 tabular-nums">{Math.round(node.strength * 100)}%</span>
+            </div>
+          )}
+
+          {node.relatedPostIds.length > 0 && (
+            <div className="flex items-center gap-1 mt-1.5">
+              {node.relatedPostIds.map((pid) => (
+                <button
+                  key={pid}
+                  onClick={() => onThreadRef(pid)}
+                  className="inline-flex items-center gap-0.5 text-[10px] text-primary/60 hover:text-primary transition-colors"
+                >
+                  <ExternalLink className="h-2.5 w-2.5" />
+                  <span className="underline underline-offset-2">{pid}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function OverviewView({ topic, onSwitchToThread }: Props) {
+  const [filter, setFilter] = useState<FilterType>('all');
+
+  const handleThreadRef = useCallback((postId: string) => {
+    onSwitchToThread?.(postId);
+  }, [onSwitchToThread]);
+
+  const allFlat = useMemo(() => flattenNodes(topic.argumentMap), [topic.argumentMap]);
+
+  const filteredFlat = useMemo(() => {
+    if (filter === 'all') return allFlat;
+    return allFlat.filter(f => f.node.type === filter);
+  }, [allFlat, filter]);
+
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of allFlat) {
+      counts[f.node.type] = (counts[f.node.type] || 0) + 1;
+    }
+    return counts;
+  }, [allFlat]);
 
   return (
     <div className="space-y-4">
-      {/* Intro */}
+      {/* Summary card */}
       <div className="surface-card px-4 py-3">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          A structured overview of the entire discussion, showing the current state of positions, tensions, open questions, and emerging proposals.
-        </p>
-      </div>
-
-      {/* Summary */}
-      <div className="surface-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-          <div className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Discussion Summary</h3>
-          </div>
-        </div>
-        <div className="px-4 py-3.5">
-          <p className="text-sm leading-relaxed text-foreground/85">{summary.text}</p>
-
-          {/* Stats */}
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{topic.participantCount} participants</span>
-            <span className="flex items-center gap-1"><BarChart3 className="h-3.5 w-3.5" />{topic.postCount} posts</span>
-            <span className="flex items-center gap-1"><Swords className="h-3.5 w-3.5" />{tensions.length} tensions</span>
-            <span className="flex items-center gap-1"><HelpCircle className="h-3.5 w-3.5" />{openQuestions.length} open questions</span>
-          </div>
+        <p className="text-sm leading-relaxed text-foreground/85">{topic.summary.text}</p>
+        <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground/50">
+          <span>{topic.participantCount} participants</span>
+          <span>{topic.postCount} posts</span>
+          <span>{topic.tensions.length} tensions</span>
+          <span>{topic.openQuestions.length} open questions</span>
         </div>
       </div>
 
-      {/* Key Positions */}
-      <div className="surface-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-          <div className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Positions</h3>
-            <span className="text-[10px] text-muted-foreground/50 ml-1">{summary.positions.length} identified</span>
-          </div>
-        </div>
-        <div className="divide-y divide-border/30">
-          {summary.positions.map((p, i) => (
+      {/* Filter bar */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Filter className="h-3 w-3 text-muted-foreground/40 mr-0.5" />
+        <button
+          onClick={() => setFilter('all')}
+          className={cn(
+            'rounded-full px-2 py-1 text-[10px] font-medium border transition-colors',
+            filter === 'all' ? 'border-primary/30 bg-primary/8 text-foreground' : 'border-border/40 text-muted-foreground/60 hover:border-border',
+          )}
+        >
+          All ({allFlat.length})
+        </button>
+        {Object.entries(nodeColors).map(([type, style]) => {
+          const count = typeCounts[type] || 0;
+          if (count === 0) return null;
+          const Icon = style.icon;
+          return (
             <button
-              key={p.postId}
-              onClick={() => scrollToPost(p.postId)}
-              className="w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-accent/30 transition-colors group"
+              key={type}
+              onClick={() => setFilter(type as FilterType)}
+              className={cn(
+                'rounded-full px-2 py-1 text-[10px] font-medium border transition-colors inline-flex items-center gap-1',
+                filter === type ? `${style.bg} ${style.border} ${style.text}` : 'border-border/40 text-muted-foreground/60 hover:border-border',
+              )}
             >
-              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold shrink-0 mt-0.5 tabular-nums">
-                {i + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium text-foreground">{p.authorName}</span>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{p.position}</p>
-              </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors shrink-0 mt-1" />
+              <Icon className="h-3 w-3" />
+              {type} ({count})
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      {/* Tensions */}
-      <div className="surface-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-          <div className="flex items-center gap-1.5">
-            <Swords className="h-3.5 w-3.5 text-argdown-objection/60" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Key Tensions</h3>
+      {/* Visual node map — flat list with indentation */}
+      <div className="space-y-2">
+        {filteredFlat.map((f) => (
+          <NodeCard
+            key={f.node.id}
+            node={f.node}
+            depth={filter === 'all' ? f.depth : 0}
+            onThreadRef={handleThreadRef}
+          />
+        ))}
+        {filteredFlat.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            No arguments matching this filter.
           </div>
-        </div>
-        <div className="divide-y divide-border/30">
-          {tensions.map((t) => {
-            const isActive = activeFilter?.type === 'tension' && activeFilter.id === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => isActive ? setFilter(null) : setFilter({ type: 'tension', id: t.id, relatedPostIds: t.relatedPostIds })}
-                className={cn(
-                  'w-full text-left px-4 py-3 hover:bg-accent/30 transition-all',
-                  isActive && 'bg-highlight-bg ring-1 ring-inset ring-highlight/40',
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm font-medium text-foreground">{t.label}</span>
-                  <span className="text-[10px] text-muted-foreground/50">{t.relatedPostIds.length} posts</span>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md bg-argdown-support/5 border border-argdown-support/15 px-2.5 py-2">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-argdown-support/70 block mb-0.5">Side A</span>
-                    <span className="text-xs text-foreground/80 leading-snug">{t.sideA}</span>
-                  </div>
-                  <div className="rounded-md bg-argdown-objection/5 border border-argdown-objection/15 px-2.5 py-2">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-argdown-objection/70 block mb-0.5">Side B</span>
-                    <span className="text-xs text-foreground/80 leading-snug">{t.sideB}</span>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        )}
       </div>
-
-      {/* Open Questions + Clusters side by side */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {/* Open Questions */}
-        <div className="surface-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-            <div className="flex items-center gap-1.5">
-              <HelpCircle className="h-3.5 w-3.5 text-argdown-question/70" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Open Questions</h3>
-            </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {openQuestions.map((q) => (
-              <button
-                key={q.id}
-                onClick={() => scrollToPost(q.raisedInPostId)}
-                className="w-full text-left px-4 py-3 hover:bg-accent/30 transition-colors"
-              >
-                <p className="text-xs text-foreground/80 leading-snug">{q.question}</p>
-                {q.raisedBy && <span className="text-[10px] text-muted-foreground/50 mt-1 block">— {q.raisedBy}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Topic Clusters */}
-        <div className="surface-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 text-primary/60" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Topic Clusters</h3>
-            </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {clusters.map((c) => {
-              const isActive = activeFilter?.type === 'cluster' && activeFilter.id === c.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => isActive ? setFilter(null) : setFilter({ type: 'cluster', id: c.id, relatedPostIds: c.relatedPostIds })}
-                  className={cn(
-                    'w-full text-left px-4 py-3 hover:bg-accent/30 transition-all',
-                    isActive && 'bg-highlight-bg',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-foreground">{c.name}</span>
-                    <span className="text-[10px] text-muted-foreground tabular-nums">{c.postCount} posts</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground/70 mt-0.5 leading-snug">{c.description}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Emerging Proposals */}
-      {topic.emergingProposals.length > 0 && (
-        <div className="surface-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/40 bg-accent/20">
-            <div className="flex items-center gap-1.5">
-              <Lightbulb className="h-3.5 w-3.5 text-argdown-proposal/70" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Emerging Proposals</h3>
-            </div>
-          </div>
-          <div className="divide-y divide-border/30">
-            {topic.emergingProposals.map((ep) => (
-              <button
-                key={ep.id}
-                onClick={() => ep.relatedPostIds[0] && scrollToPost(ep.relatedPostIds[0])}
-                className="w-full text-left px-4 py-3 hover:bg-accent/30 transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-foreground">{ep.title}</span>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{ep.description}</p>
-                    <span className="text-[10px] text-muted-foreground/50 mt-1 block">
-                      Supported by {ep.supportedBy.join(', ')}
-                    </span>
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors shrink-0 mt-1" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
