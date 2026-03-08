@@ -23,57 +23,57 @@ export default function TopicCard({ topic, preview }: TopicCardProps) {
   return (
     <Link
       to={href}
-      className="flex gap-4 px-4 py-3.5 hover:bg-accent/50 transition-colors group"
+      className="block group"
     >
-      {/* Vote/post count column */}
-      <div className="flex flex-col items-center justify-start pt-1 min-w-[2.5rem] shrink-0">
-        <span className="text-sm font-bold text-foreground tabular-nums">{topic.postCount}</span>
-        <span className="text-[10px] text-muted-foreground">posts</span>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 min-w-0 space-y-1">
-        {/* Title row */}
-        <div className="flex items-start gap-2">
-          <h3 className="text-sm font-semibold text-foreground leading-snug group-hover:text-primary transition-colors flex-1 min-w-0">
-            {topic.title}
-          </h3>
-          <Badge className={cn('text-[10px] border shrink-0 px-1.5 py-0', status.className)}>
+      <div className="surface-card-elevated p-5 hover:border-primary/30 transition-all">
+        {/* Top row: category + status */}
+        <div className="flex items-center justify-between mb-2.5">
+          <Badge variant="outline" className="text-[11px] font-medium px-2 py-0.5 border-border">{topic.category}</Badge>
+          <Badge className={cn('text-[10px] border shrink-0 px-2 py-0.5', status.className)}>
             {status.label}
           </Badge>
         </div>
 
+        {/* Title */}
+        <h3 className="text-base font-semibold text-foreground leading-snug group-hover:text-primary transition-colors mb-2">
+          {topic.title}
+        </h3>
+
+        {/* Deliberation preview */}
+        {preview && (
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3 line-clamp-2">
+            {preview.summary}
+          </p>
+        )}
+
         {/* Meta row */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-          <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0 border-border/60">{topic.category}</Badge>
-          <span className="flex items-center gap-1">
+        <div className="flex items-center gap-3.5 text-xs text-muted-foreground flex-wrap">
+          <span className="flex items-center gap-1.5">
             <div
-              className="h-4 w-4 rounded-full flex items-center justify-center text-[7px] font-bold text-primary-foreground shrink-0"
+              className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-bold text-primary-foreground shrink-0"
               style={{ backgroundColor: `hsl(${topic.author.color})` }}
             />
-            {topic.author.name}
+            <span className="font-medium text-foreground/80">{topic.author.name}</span>
           </span>
-          <span className="flex items-center gap-1"><Users className="h-3 w-3" />{topic.participantCount}</span>
-          <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{topic.postCount}</span>
+          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{topic.participantCount}</span>
+          <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" />{topic.postCount} posts</span>
           <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
+            <Clock className="h-3.5 w-3.5" />
             {formatDistanceToNow(new Date(topic.lastActivity), { addSuffix: true })}
           </span>
         </div>
 
-        {/* Deliberation preview */}
+        {/* Deliberation pulse */}
         {preview && (
-          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground pt-0.5">
-            <span className="flex items-center gap-1">
-              <Swords className="h-3 w-3 text-argdown-objection/60" />
-              {preview.tensions} tensions
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
+            <span className="flex items-center gap-1.5">
+              <Swords className="h-3.5 w-3.5 text-argdown-objection" />
+              <span className="font-medium text-foreground/70">{preview.tensions}</span> tensions
             </span>
-            <span className="flex items-center gap-1">
-              <HelpCircle className="h-3 w-3 text-argdown-question/70" />
-              {preview.openQuestions} open
+            <span className="flex items-center gap-1.5">
+              <HelpCircle className="h-3.5 w-3.5 text-argdown-question" />
+              <span className="font-medium text-foreground/70">{preview.openQuestions}</span> open questions
             </span>
-            <span className="text-border">·</span>
-            <span className="truncate italic text-muted-foreground/70 flex-1 min-w-0">{preview.summary}</span>
           </div>
         )}
       </div>
