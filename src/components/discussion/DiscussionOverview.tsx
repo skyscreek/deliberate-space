@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DiscussionSummaryData, Tension, OpenQuestion, GuidanceItem } from '@/types/discussion';
 import { useDiscussion } from '@/context/DiscussionContext';
 import { Sparkles, ChevronDown, AlertTriangle, HelpCircle, Lightbulb, Compass } from 'lucide-react';
@@ -39,13 +40,18 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
 
   return (
     <div className="surface-card-elevated overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50">
+      {/* Collapsible Header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-4 py-2.5 border-b border-border/50 hover:bg-accent/20 transition-colors"
+      >
         <Sparkles className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-semibold" style={{ color: 'hsl(var(--insights-header))' }}>Discussion Insights</span>
         <span className="text-[10px] text-primary/70 bg-primary/8 px-1.5 py-0.5 rounded font-medium">AI</span>
-      </div>
+        <ChevronDown className={cn('h-3.5 w-3.5 ml-auto text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
 
+      {open && (
       <Accordion type="multiple" defaultValue={["summary"]} className="divide-y" style={{ '--tw-divide-color': 'hsl(var(--insights-border))' } as React.CSSProperties}>
         {/* Summary */}
         <AccordionItem value="summary" className="border-0">
