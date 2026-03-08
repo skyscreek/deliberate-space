@@ -45,7 +45,8 @@ export function useAnalysis(topicId: string | undefined) {
   return useQuery({
     queryKey: ['analysis', topicId],
     enabled: !!topicId,
-    staleTime: 5 * 60 * 1000, // 5 min
+    staleTime: Infinity,
+    gcTime: Infinity,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_analyses')
