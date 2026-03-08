@@ -190,6 +190,11 @@ const Index = () => {
           </div>
         )}
 
+        {/* Topic network graph */}
+        {topics && topics.length >= 2 && (
+          <TopicNetworkGraph topics={topics} relations={relations ?? []} />
+        )}
+
         <div className="space-y-3">
           {topics?.map((topic) => (
             <TopicCardLive key={topic.id} topic={topic} />
