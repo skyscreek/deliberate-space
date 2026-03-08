@@ -13,7 +13,7 @@ export interface PostRow {
   depth: number;
   created_at: string;
   updated_at: string;
-  author_profile?: { display_name: string; avatar_url: string | null };
+  author_profile?: { display_name: string; avatar_url: string | null; username: string };
   children?: PostRow[];
 }
 
@@ -30,12 +30,12 @@ async function fetchPosts(topicId: string): Promise<PostRow[]> {
   const authorIds = [...new Set((data || []).map(p => p.author_id))];
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('user_id, display_name, avatar_url')
+    .select('user_id, display_name, avatar_url, username')
     .in('user_id', authorIds);
 
-  const profileMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  const profileMap = new Map<string, { display_name: string; avatar_url: string | null; username: string }>();
   for (const p of profiles || []) {
-    profileMap.set(p.user_id, { display_name: p.display_name, avatar_url: p.avatar_url });
+    profileMap.set(p.user_id, { display_name: p.display_name, avatar_url: p.avatar_url, username: p.username });
   }
 
   const postsWithProfiles = (data || []).map(p => ({

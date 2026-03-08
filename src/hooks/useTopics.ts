@@ -13,7 +13,7 @@ export interface TopicRow {
   created_at: string;
   updated_at: string;
   canonical_topic_id: string | null;
-  author_profile?: { display_name: string; avatar_url: string | null };
+  author_profile?: { display_name: string; avatar_url: string | null; username: string };
   post_count?: number;
   participant_count?: number;
   last_activity?: string;
@@ -32,12 +32,12 @@ async function fetchTopics(): Promise<TopicRow[]> {
   const authorIds = [...new Set(topics.map(t => t.author_id))];
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('user_id, display_name, avatar_url')
+    .select('user_id, display_name, avatar_url, username')
     .in('user_id', authorIds);
 
-  const profileMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  const profileMap = new Map<string, { display_name: string; avatar_url: string | null; username: string }>();
   for (const p of profiles || []) {
-    profileMap.set(p.user_id, { display_name: p.display_name, avatar_url: p.avatar_url });
+    profileMap.set(p.user_id, { display_name: p.display_name, avatar_url: p.avatar_url, username: p.username });
   }
 
   // Fetch post stats
