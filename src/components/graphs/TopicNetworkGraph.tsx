@@ -455,28 +455,35 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
   return (
     <div className={cn(
-      'rounded-xl overflow-hidden border border-border/30',
+      'rounded-xl overflow-hidden border border-border/50',
       expanded && 'fixed inset-4 z-50'
     )} style={{ background: 'hsl(var(--graph-bg))' }}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/30">
         <div className="flex items-center gap-2">
-          <Network className="h-4 w-4 text-white/60" />
-          <span className="text-xs font-semibold text-white/80">Discourse Network</span>
-          <span className="text-[10px] text-white/40 ml-1">
+          <Network className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground/80">Discourse Network</span>
+          <span className="text-[10px] text-muted-foreground ml-1">
             {topics.length} topics · {relations.length} connections
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setTransform({ x: 0, y: 0, k: 1 })}
-            className="text-[10px] text-white/50 hover:text-white/80 px-2 py-1 rounded hover:bg-white/5 transition-colors"
+            className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors"
           >
             Reset view
           </button>
           <button
+            onClick={() => setSidebarOpen(s => !s)}
+            className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
+            title={sidebarOpen ? 'Collapse panel' : 'Expand panel'}
+          >
+            {sidebarOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          </button>
+          <button
             onClick={() => setExpanded(e => !e)}
-            className="text-white/50 hover:text-white/80 p-1 rounded hover:bg-white/5 transition-colors"
+            className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-accent transition-colors"
           >
             {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </button>
@@ -504,7 +511,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
               <span
                 key={c.id}
                 className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{ background: c.color.replace(')', ' / 0.2)').replace('hsl(', 'hsla('), color: c.color }}
+                style={{ background: hslA(c.id, 0.2), color: c.color }}
               >
                 {c.label}
               </span>
@@ -512,23 +519,29 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
           </div>
 
           {/* Zoom indicator */}
-          <span className="absolute bottom-3 right-3 text-[10px] text-white/30">
+          <span className="absolute bottom-3 right-3 text-[10px] text-muted-foreground/50">
             {Math.round(transform.k * 100)}%
           </span>
         </div>
 
-        {/* Insights sidebar */}
-        <div className="w-64 border-l border-white/10 overflow-y-auto flex-shrink-0" style={{ background: 'hsla(220, 15%, 10%, 0.9)' }}>
-          <div className="p-3 space-y-4">
+        {/* Insights sidebar — collapsible */}
+        <div
+          className={cn(
+            'border-l border-border/30 overflow-y-auto flex-shrink-0 transition-all duration-300',
+            sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
+          )}
+          style={{ background: 'hsl(var(--graph-bg))' }}
+        >
+          <div className="p-3 space-y-4 w-64">
             {/* Main Topics */}
             <div>
-              <h4 className="text-[11px] font-semibold text-white/70 uppercase tracking-wider mb-2">Main Topics</h4>
+              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Main Topics</h4>
               <div className="space-y-1.5">
                 {clusters.map(c => (
                   <div key={c.id} className="flex items-center gap-2">
                     <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ background: c.color, color: 'hsl(220, 15%, 8%)' }}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap text-white"
+                      style={{ background: c.color }}
                     >
                       {c.percentage}%: {c.label}
                     </span>
@@ -537,7 +550,7 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
                 {clusters.flatMap(c => c.nodes.slice(0, 3)).map(n => (
-                  <span key={n.id} className="text-[9px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">
+                  <span key={n.id} className="text-[9px] text-muted-foreground bg-accent px-1.5 py-0.5 rounded">
                     {n.title.length > 20 ? n.title.slice(0, 18) + '…' : n.title}
                   </span>
                 ))}
@@ -547,29 +560,29 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
             {/* Gaps to Connect */}
             {gaps.length > 0 && (
               <div>
-                <h4 className="text-[11px] font-semibold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-1">
+                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
                   <Lightbulb className="h-3 w-3" /> Gaps to Connect
                 </h4>
                 <div className="space-y-2">
                   {gaps.map((gap, i) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                        style={{ background: gap.a.color, color: 'hsl(220, 15%, 8%)' }}
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white"
+                        style={{ background: gap.a.color }}
                       >
                         {gap.a.label}
                       </span>
-                      <span className="text-[10px] text-white/30">↔</span>
+                      <span className="text-[10px] text-muted-foreground">↔</span>
                       <span
-                        className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                        style={{ background: gap.b.color, color: 'hsl(220, 15%, 8%)' }}
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded text-white"
+                        style={{ background: gap.b.color }}
                       >
                         {gap.b.label}
                       </span>
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-white/30 mt-1.5 leading-relaxed">
+                <p className="text-[10px] text-muted-foreground/70 mt-1.5 leading-relaxed">
                   These topic clusters have few connections. Bridge them with new discussions.
                 </p>
               </div>
@@ -577,17 +590,17 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
 
             {/* Selected node detail */}
             {selectedNodeData && (
-              <div className="border-t border-white/10 pt-3">
-                <h4 className="text-[11px] font-semibold text-white/70 uppercase tracking-wider mb-1.5">Selected</h4>
-                <p className="text-xs text-white/90 font-medium">{selectedNodeData.title}</p>
-                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/50">
+              <div className="border-t border-border/30 pt-3">
+                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Selected</h4>
+                <p className="text-xs text-foreground font-medium">{selectedNodeData.title}</p>
+                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
                   <span>{selectedNodeData.postCount} posts</span>
                   <span>·</span>
                   <span>{selectedNodeData.importance} connections</span>
                 </div>
                 <button
                   onClick={() => navigate(`/d/${selectedNodeData.slug}`)}
-                  className="mt-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                  className="mt-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded hover:bg-accent transition-colors"
                   style={{ color: CLUSTER_COLORS[selectedNodeData.cluster % CLUSTER_COLORS.length] }}
                 >
                   Open discussion <ChevronRight className="h-3 w-3" />
@@ -596,24 +609,24 @@ export default function TopicNetworkGraph({ topics, relations }: Props) {
             )}
 
             {/* Stats */}
-            <div className="border-t border-white/10 pt-3">
-              <h4 className="text-[11px] font-semibold text-white/70 uppercase tracking-wider mb-2">Stats</h4>
+            <div className="border-t border-border/30 pt-3">
+              <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Stats</h4>
               <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-white/5 rounded p-2">
-                  <div className="text-sm font-bold text-white/90">{topics.length}</div>
-                  <div className="text-[9px] text-white/40">Topics</div>
+                <div className="bg-accent rounded p-2">
+                  <div className="text-sm font-bold text-foreground">{topics.length}</div>
+                  <div className="text-[9px] text-muted-foreground">Topics</div>
                 </div>
-                <div className="bg-white/5 rounded p-2">
-                  <div className="text-sm font-bold text-white/90">{relations.length}</div>
-                  <div className="text-[9px] text-white/40">Connections</div>
+                <div className="bg-accent rounded p-2">
+                  <div className="text-sm font-bold text-foreground">{relations.length}</div>
+                  <div className="text-[9px] text-muted-foreground">Connections</div>
                 </div>
-                <div className="bg-white/5 rounded p-2">
-                  <div className="text-sm font-bold text-white/90">{clusters.length}</div>
-                  <div className="text-[9px] text-white/40">Clusters</div>
+                <div className="bg-accent rounded p-2">
+                  <div className="text-sm font-bold text-foreground">{clusters.length}</div>
+                  <div className="text-[9px] text-muted-foreground">Clusters</div>
                 </div>
-                <div className="bg-white/5 rounded p-2">
-                  <div className="text-sm font-bold text-white/90">{gaps.length}</div>
-                  <div className="text-[9px] text-white/40">Gaps</div>
+                <div className="bg-accent rounded p-2">
+                  <div className="text-sm font-bold text-foreground">{gaps.length}</div>
+                  <div className="text-[9px] text-muted-foreground">Gaps</div>
                 </div>
               </div>
             </div>
