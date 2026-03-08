@@ -77,7 +77,7 @@ export default function DiscussionOverview({ summary, tensions, openQuestions, g
       </button>
 
       {open && (
-      <Accordion type="multiple" defaultValue={["summary"]} className="divide-y" style={{ '--tw-divide-color': 'hsl(var(--insights-border))' } as React.CSSProperties}>
+      <Accordion type="multiple" defaultValue={["summary"]} className="divide-y divide-border/50">
         {/* Summary */}
         <AccordionItem value="summary" className="border-0">
           <AccordionTrigger className="px-4 py-2.5 text-xs hover:no-underline hover:bg-accent/30">

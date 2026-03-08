@@ -15,7 +15,6 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
   const { assistedComment, clearAssistedComment, replyingToPostId } = useDiscussion();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // If replying inline to a specific post, don't show the bottom composer for that same context
   const isInlineReply = replyingToPostId && assistedComment?.replyToPostId;
 
   useEffect(() => {
@@ -25,13 +24,12 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
     }
   }, [assistedComment, isInlineReply]);
 
-  // Don't show the bottom composer when the inline one is active
   if (isInlineReply) return null;
 
   const isAssisted = assistedComment && !assistedComment.label.startsWith('Replying to');
 
   return (
-    <div id="composer-box" className="surface-card p-4 space-y-3">
+    <div id="composer-box" className="surface-card-elevated p-5 space-y-3">
       {isAssisted ? (
         <div className="rounded-md border border-primary/20 bg-primary/[0.03] px-4 py-3 space-y-2.5">
           <div className="flex items-start justify-between gap-2">
@@ -48,7 +46,7 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
           </div>
 
           {assistedComment.replyToAuthor && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-accent/30 rounded-md px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-accent/50 rounded-md px-2.5 py-1.5">
               <CornerDownRight className="h-3 w-3" />
               <span>Replying near <strong className="text-foreground">{assistedComment.replyToAuthor}</strong></span>
             </div>
@@ -78,7 +76,7 @@ export default function ComposerBox({ guidance }: { guidance: GuidanceItem[] }) 
           ? `Write your ${assistedComment?.suggestedArgdownType || 'contribution'} here…`
           : 'Share your perspective, evidence, or questions…'
         }
-        className="min-h-[100px] resize-y bg-accent/20 border-border/40 focus:border-primary/40"
+        className="min-h-[100px] resize-y bg-accent/30 border-border/60 focus:border-primary/40"
       />
       <div className="flex items-center justify-between">
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">

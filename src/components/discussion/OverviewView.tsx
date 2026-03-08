@@ -7,7 +7,7 @@ interface Props {
   onSwitchToThread?: (postId: string) => void;
 }
 
-/* Visual cluster bubble for graphical overview */
+/* Visual cluster bubble */
 function ClusterBubble({ name, description, postCount, isActive, onClick }: {
   name: string; description: string; postCount: number; isActive: boolean; onClick: () => void;
 }) {
@@ -15,15 +15,13 @@ function ClusterBubble({ name, description, postCount, isActive, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        'rounded-xl border px-4 py-3 text-left transition-all hover:shadow-sm',
-        isActive
-          ? 'border-primary/30 bg-primary/5 shadow-sm'
-          : 'border-border/40 bg-card hover:border-border/60',
+        'surface-card-elevated px-4 py-3 text-left transition-all hover:border-primary/30',
+        isActive && 'border-primary/30 ring-1 ring-primary/20',
       )}
     >
       <span className="text-sm font-medium text-foreground block">{name}</span>
-      <span className="text-[11px] text-muted-foreground/60 block mt-0.5 leading-snug">{description}</span>
-      <span className="text-[10px] text-muted-foreground/40 mt-1.5 block">{postCount} posts</span>
+      <span className="text-xs text-muted-foreground block mt-0.5 leading-snug">{description}</span>
+      <span className="text-[11px] text-muted-foreground/70 mt-1.5 block">{postCount} posts</span>
     </button>
   );
 }
@@ -33,19 +31,19 @@ function TensionRow({ label, sideA, sideB, postCount, onClick }: {
   label: string; sideA: string; sideB: string; postCount: number; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className="w-full text-left rounded-lg border border-border/40 bg-card p-3 hover:border-border/60 transition-all">
-      <span className="text-[11px] font-medium text-foreground block">{label}</span>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <div className="rounded bg-accent/40 px-2 py-1.5">
-          <span className="text-[10px] text-muted-foreground/50 block mb-0.5">Side A</span>
-          <span className="text-[11px] text-foreground/70 leading-snug block">{sideA.length > 80 ? sideA.slice(0, 80) + '…' : sideA}</span>
+    <button onClick={onClick} className="w-full text-left surface-card-elevated p-4 transition-all hover:border-primary/30">
+      <span className="text-xs font-semibold text-foreground block">{label}</span>
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <div className="rounded-md bg-accent/60 px-2.5 py-2">
+          <span className="text-[10px] text-muted-foreground block mb-0.5 font-medium">Side A</span>
+          <span className="text-xs text-foreground/80 leading-snug block">{sideA.length > 80 ? sideA.slice(0, 80) + '…' : sideA}</span>
         </div>
-        <div className="rounded bg-accent/40 px-2 py-1.5">
-          <span className="text-[10px] text-muted-foreground/50 block mb-0.5">Side B</span>
-          <span className="text-[11px] text-foreground/70 leading-snug block">{sideB.length > 80 ? sideB.slice(0, 80) + '…' : sideB}</span>
+        <div className="rounded-md bg-accent/60 px-2.5 py-2">
+          <span className="text-[10px] text-muted-foreground block mb-0.5 font-medium">Side B</span>
+          <span className="text-xs text-foreground/80 leading-snug block">{sideB.length > 80 ? sideB.slice(0, 80) + '…' : sideB}</span>
         </div>
       </div>
-      <span className="text-[10px] text-muted-foreground/30 mt-1.5 block">{postCount} related posts</span>
+      <span className="text-[11px] text-muted-foreground mt-2 block">{postCount} related posts</span>
     </button>
   );
 }
@@ -55,11 +53,11 @@ function ProposalCard({ title, description, supportedBy, onClick }: {
   title: string; description: string; supportedBy: string[]; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className="w-full text-left rounded-lg border border-argdown-proposal/20 bg-argdown-proposal/5 p-3 hover:border-argdown-proposal/30 transition-all">
-      <span className="text-[11px] font-medium text-foreground block">{title}</span>
-      <span className="text-[11px] text-muted-foreground/60 block mt-0.5 leading-snug">{description}</span>
+    <button onClick={onClick} className="w-full text-left surface-card-elevated p-4 border-l-2 border-l-argdown-proposal/40 transition-all hover:border-primary/30">
+      <span className="text-xs font-semibold text-foreground block">{title}</span>
+      <span className="text-xs text-muted-foreground block mt-0.5 leading-snug">{description}</span>
       {supportedBy.length > 0 && (
-        <span className="text-[10px] text-muted-foreground/40 mt-1 block">Supported by {supportedBy.join(', ')}</span>
+        <span className="text-[11px] text-muted-foreground/70 mt-1.5 block">Supported by {supportedBy.join(', ')}</span>
       )}
     </button>
   );
@@ -70,7 +68,7 @@ function StatItem({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="text-center">
       <span className="text-lg font-bold text-foreground block">{value}</span>
-      <span className="text-[10px] text-muted-foreground/50">{label}</span>
+      <span className="text-[10px] text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -78,7 +76,6 @@ function StatItem({ label, value }: { label: string; value: number | string }) {
 export default function OverviewView({ topic, onSwitchToThread }: Props) {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
 
-  // Count argument types
   const argCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     function walk(n: ArgumentNode) {
@@ -100,9 +97,9 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
   }, [topic.argumentMap]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* At-a-glance stats */}
-      <div className="surface-card px-4 py-3">
+      <div className="surface-card-elevated px-4 py-3.5">
         <div className="grid grid-cols-5 gap-2">
           <StatItem label="Participants" value={topic.participantCount} />
           <StatItem label="Posts" value={topic.postCount} />
@@ -112,15 +109,43 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="px-1">
-        <p className="text-[13px] leading-relaxed text-foreground/75">{topic.summary.text}</p>
+      {/* Argument composition — moved up */}
+      <div className="surface-card-elevated p-4">
+        <h3 className="text-xs font-semibold text-foreground mb-2.5">Argument Composition</h3>
+        <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
+          {Object.entries(argCounts).map(([type, count]) => {
+            const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
+            const colors: Record<string, string> = {
+              claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
+              concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
+              proposal: 'bg-argdown-proposal',
+            };
+            return (
+              <div
+                key={type}
+                className={cn('h-full', colors[type] || 'bg-muted')}
+                style={{ width: `${(count / total) * 100}%` }}
+                title={`${type}: ${count}`}
+              />
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
+          {Object.entries(argCounts).map(([type, count]) => (
+            <span key={type} className="text-[11px] text-muted-foreground capitalize">{type} {count}</span>
+          ))}
+        </div>
       </div>
 
-      {/* Topic clusters — graphical bubbles */}
+      {/* Summary */}
+      <div className="surface-card-elevated p-4">
+        <p className="text-sm leading-relaxed text-foreground/85">{topic.summary.text}</p>
+      </div>
+
+      {/* Topic clusters */}
       <div>
-        <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-2 px-1">Topic Clusters</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Topic Clusters</h3>
+        <div className="grid grid-cols-2 gap-3">
           {topic.clusters.map((c) => (
             <ClusterBubble
               key={c.id}
@@ -137,10 +162,10 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
         </div>
       </div>
 
-      {/* Tensions — visual pairs */}
+      {/* Tensions */}
       <div>
-        <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-2 px-1">Key Tensions</h3>
-        <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Key Tensions</h3>
+        <div className="space-y-3">
           {topic.tensions.map((t) => (
             <TensionRow
               key={t.id}
@@ -159,8 +184,8 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
       {/* Emerging Proposals */}
       {topic.emergingProposals.length > 0 && (
         <div>
-          <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-2 px-1">Emerging Proposals</h3>
-          <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 px-1">Emerging Proposals</h3>
+          <div className="space-y-3">
             {topic.emergingProposals.map((ep) => (
               <ProposalCard
                 key={ep.id}
@@ -175,34 +200,6 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
           </div>
         </div>
       )}
-
-      {/* Argument composition bar */}
-      <div>
-        <h3 className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider mb-2 px-1">Argument Composition</h3>
-        <div className="flex gap-1 h-3 rounded-full overflow-hidden">
-          {Object.entries(argCounts).map(([type, count]) => {
-            const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
-            const colors: Record<string, string> = {
-              claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
-              concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
-              proposal: 'bg-argdown-proposal',
-            };
-            return (
-              <div
-                key={type}
-                className={cn('h-full', colors[type] || 'bg-muted')}
-                style={{ width: `${(count / total) * 100}%` }}
-                title={`${type}: ${count}`}
-              />
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-          {Object.entries(argCounts).map(([type, count]) => (
-            <span key={type} className="text-[10px] text-muted-foreground/40">{type} {count}</span>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
