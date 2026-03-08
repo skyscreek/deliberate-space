@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/d/:slug" element={<Discussion />} />
             <Route path="/category/:slug" element={<Category />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/u/:username" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

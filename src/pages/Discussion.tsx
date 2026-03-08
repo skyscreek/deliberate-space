@@ -226,7 +226,7 @@ function ReplyNode({ post, topicId, depth = 0 }: { post: PostRow; topicId: strin
           <>
             <div className="py-1.5">
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <Link to={`/profile/${post.author_id}`} className="font-semibold text-foreground hover:text-primary transition-colors">{authorName}</Link>
+                <Link to={`/u/${post.author_profile?.username || post.author_id}`} className="font-semibold text-foreground hover:text-primary transition-colors">{authorName}</Link>
                 {post.argdown_type && (
                   <span className={cn('text-[10px] italic font-medium', argdownColors[post.argdown_type] || 'text-muted-foreground')}>
                     {post.argdown_type}
@@ -327,7 +327,7 @@ const PostCard = forwardRef<HTMLDivElement, { post: PostRow; topicId: string }>(
             ) : (
               <>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Link to={`/profile/${post.author_id}`} className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{authorName}</Link>
+                  <Link to={`/u/${post.author_profile?.username || post.author_id}`} className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{authorName}</Link>
                   {post.argdown_type && (
                     <span className={cn('text-[10px] italic font-medium', argdownColors[post.argdown_type] || 'text-muted-foreground')}>
                       {post.argdown_type}
@@ -440,7 +440,7 @@ function TopLevelComposer({ topicId }: { topicId: string }) {
   );
 }
 
-function TopicHeaderLive({ topic }: { topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string }; created_at: string; post_count?: number; participant_count?: number } }) {
+function TopicHeaderLive({ topic }: { topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string; username?: string }; created_at: string; post_count?: number; participant_count?: number } }) {
   const [open, setOpen] = useState(true);
   const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'text-vote-up font-semibold' },
@@ -470,7 +470,7 @@ function TopicHeaderLive({ topic }: { topic: { title: string; description: strin
               <p className="text-sm leading-relaxed text-foreground/80">{topic.description}</p>
             )}
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1">
-              <Link to={`/profile/${topic.author_id}`} className="font-medium text-foreground/80 hover:text-primary transition-colors">{topic.author_profile?.display_name || 'Unknown'}</Link>
+              <Link to={`/u/${topic.author_profile?.username || topic.author_id}`} className="font-medium text-foreground/80 hover:text-primary transition-colors">{topic.author_profile?.display_name || 'Unknown'}</Link>
               <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDistanceToNow(new Date(topic.created_at), { addSuffix: true })}</span>
               <span className="flex items-center gap-1"><Users className="h-3 w-3" />{topic.participant_count ?? 0}</span>
               <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{topic.post_count ?? 0} posts</span>

@@ -5,6 +5,7 @@ export interface ProfileData {
   id: string;
   user_id: string;
   display_name: string;
+  username: string;
   avatar_url: string | null;
   bio: string | null;
   location: string | null;
@@ -20,6 +21,23 @@ export function useProfile(userId: string | undefined) {
         .from('profiles')
         .select('*')
         .eq('user_id', userId!)
+        .single();
+      if (error) throw error;
+      return data as ProfileData;
+    },
+  });
+}
+
+/** Lookup profile by username */
+export function useProfileByUsername(username: string | undefined) {
+  return useQuery({
+    queryKey: ['profile-by-username', username],
+    enabled: !!username,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username!)
         .single();
       if (error) throw error;
       return data as ProfileData;
