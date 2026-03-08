@@ -184,15 +184,43 @@ Rules:
     const aiData = await aiResponse.json();
     let content = aiData.choices?.[0]?.message?.content || "";
     
-    // Strip markdown fences if present
-    content = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    
+    // Strip markdown fences and find JSON boundaries
+    content = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const jsonStart = content.search(/[\{\[]/);
+    if (jsonStart === -1) throw new Error("No JSON found in AI response");
+    const jsonEnd = content.lastIndexOf("}");
+    if (jsonEnd === -1) throw new Error("No closing brace in AI response");
+    content = content.substring(jsonStart, jsonEnd + 1);
+
     let analysis;
     try {
       analysis = JSON.parse(content);
     } catch (parseErr) {
-      console.error("Failed to parse AI response:", content);
-      throw new Error("AI returned invalid JSON");
+      // Attempt repair: trailing commas, control chars, unbalanced brackets
+      let repaired = content
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]")
+        .replace(/[\x00-\x1F\x7F]/g, "");
+
+      // Fix truncated arrays/objects by closing unbalanced delimiters
+      const opens = (repaired.match(/{/g) || []).length;
+      const closes = (repaired.match(/}/g) || []).length;
+      const openBr = (repaired.match(/\[/g) || []).length;
+      const closeBr = (repaired.match(/\]/g) || []).length;
+      // Remove any trailing comma before we close
+      repaired = repaired.replace(/,\s*$/, "");
+      for (let i = 0; i < openBr - closeBr; i++) repaired += "]";
+      for (let i = 0; i < opens - closes; i++) repaired += "}";
+      // Clean again after appending
+      repaired = repaired.replace(/,\s*}/g, "}").replace(/,\s*]/g, "]");
+
+      try {
+        analysis = JSON.parse(repaired);
+        console.warn("AI response required JSON repair");
+      } catch (finalErr) {
+        console.error("Failed to parse AI response even after repair:", content.substring(0, 500));
+        throw new Error("AI returned invalid JSON");
+      }
     }
 
     // Store in ai_analyses — upsert by topic_id + analysis_type
