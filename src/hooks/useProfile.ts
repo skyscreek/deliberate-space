@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ProfileData {
@@ -56,6 +56,25 @@ export function useProfilePosts(userId: string | undefined) {
         .limit(20);
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, updates }: { userId: string; updates: { display_name?: string; bio?: string | null; location?: string | null } }) => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('user_id', userId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['profile', data.user_id] });
     },
   });
 }
