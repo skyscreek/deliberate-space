@@ -1,7 +1,8 @@
 export interface Author {
   id: string;
   name: string;
-  avatar: string;
+  avatar: string; // initials like "MC", "JO"
+  color: string;  // hsl bg color for avatar circle
   role?: string;
 }
 
@@ -16,7 +17,9 @@ export interface Reply {
   author: Author;
   content: string;
   createdAt: string;
+  score: number;
   reactions: Reaction[];
+  replies?: Reply[]; // nested replies
 }
 
 export interface Post {
@@ -24,6 +27,7 @@ export interface Post {
   author: Author;
   content: string;
   createdAt: string;
+  score: number;
   reactions: Reaction[];
   replies: Reply[];
 }
@@ -66,6 +70,7 @@ export interface TopicMeta {
   status: 'active' | 'seeking-consensus' | 'resolved';
   author: Author;
   createdAt: string;
+  lastActivity: string;
   participantCount: number;
   postCount: number;
   proposal: string;
@@ -93,7 +98,6 @@ export interface DiscussionSummaryData {
   emergingProposals: EmergingProposal[];
 }
 
-// Argument map types
 export interface ArgumentNode {
   id: string;
   type: 'claim' | 'support' | 'objection' | 'concern' | 'alternative' | 'question' | 'proposal';
