@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Topic, ArgumentNode } from '@/types/discussion';
 import { cn } from '@/lib/utils';
 
@@ -99,6 +99,7 @@ function StatItem({ label, value }: { label: string; value: number | string }) {
 
 export default function OverviewView({ topic, onSwitchToThread }: Props) {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null);
+  const [highlightedType, setHighlightedType] = useState<string | null>(null);
 
   const argCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -136,29 +137,52 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
       {/* Argument composition — moved up */}
       <div className="surface-card-elevated p-4">
         <h3 className="text-xs font-semibold text-foreground mb-2.5">Argument Composition</h3>
-        <div className="flex gap-1 h-2.5 rounded-full overflow-hidden">
-          {Object.entries(argCounts).map(([type, count]) => {
-            const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
-            const colors: Record<string, string> = {
-              claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
-              concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
-              proposal: 'bg-argdown-proposal',
-            };
-            return (
-              <div
-                key={type}
-                className={cn('h-full', colors[type] || 'bg-muted')}
-                style={{ width: `${(count / total) * 100}%` }}
-                title={`${type}: ${count}`}
-              />
-            );
-          })}
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-2">
-          {Object.entries(argCounts).map(([type, count]) => (
-            <span key={type} className="text-[11px] text-muted-foreground capitalize">{type} {count}</span>
-          ))}
-        </div>
+        {(() => {
+          const total = Object.values(argCounts).reduce((a, b) => a + b, 0);
+          const colorMap: Record<string, string> = {
+            claim: 'bg-argdown-claim', support: 'bg-argdown-support', objection: 'bg-argdown-objection',
+            concern: 'bg-argdown-concern', alternative: 'bg-argdown-alternative', question: 'bg-argdown-question',
+            proposal: 'bg-argdown-proposal',
+          };
+          return (
+            <>
+              <div className="flex gap-0.5 h-3 rounded-full overflow-hidden">
+                {Object.entries(argCounts).map(([type, count]) => (
+                  <button
+                    key={type}
+                    className={cn(
+                      'h-full transition-all duration-200 cursor-pointer',
+                      colorMap[type] || 'bg-muted',
+                      highlightedType && highlightedType !== type && 'opacity-25',
+                    )}
+                    style={{ width: `${(count / total) * 100}%` }}
+                    title={`${type}: ${count}`}
+                    onClick={() => setHighlightedType(highlightedType === type ? null : type)}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
+                {Object.entries(argCounts).map(([type, count]) => (
+                  <button
+                    key={type}
+                    onClick={() => setHighlightedType(highlightedType === type ? null : type)}
+                    className={cn(
+                      'flex items-center gap-1.5 text-[11px] capitalize transition-all duration-150 rounded px-1.5 py-0.5 -mx-1.5',
+                      highlightedType === type
+                        ? 'text-foreground font-medium bg-accent'
+                        : highlightedType
+                          ? 'text-muted-foreground/50 hover:text-muted-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <span className={cn('inline-block w-2 h-2 rounded-full shrink-0', colorMap[type] || 'bg-muted')} />
+                    {type} {count}
+                  </button>
+                ))}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Summary */}
