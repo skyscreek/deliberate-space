@@ -203,7 +203,19 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     const graph = new Graph();
     graphRef.current = graph;
 
+    const includedNodes = new Set<string>();
+    if (mode === 'local' && currentTopicId) {
+      includedNodes.add(currentTopicId);
+      for (const r of relations) {
+        if (r.source_topic_id === currentTopicId) includedNodes.add(r.target_topic_id);
+        if (r.target_topic_id === currentTopicId) includedNodes.add(r.source_topic_id);
+      }
+    } else {
+      for (const t of topics) includedNodes.add(t.id);
+    }
+
     for (const t of topics) {
+      if (!includedNodes.has(t.id)) continue;
       const cl = clusterMap.get(t.category) ?? 0;
       const color = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
       graph.addNode(t.id, {
