@@ -155,34 +155,40 @@ interface EdgeLineProps {
 }
 
 function EdgeLine({ source, target, sameCluster, clusterIdx, isDimmed, isHighlighted }: EdgeLineProps) {
-  const lineRef = useRef<THREE.Line>(null);
-  const geoRef = useRef<THREE.BufferGeometry>(null);
-
-  useFrame(() => {
-    if (geoRef.current) {
-      const positions = new Float32Array([
-        (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08,
-        (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08,
-      ]);
-      geoRef.current.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    }
-  });
+  const lineRef = useRef<THREE.LineSegments>(null);
 
   const color = sameCluster
     ? CLUSTER_THREE_COLORS[clusterIdx % CLUSTER_THREE_COLORS.length]
     : new THREE.Color('#aaa');
 
-  return (
-    <line ref={lineRef}>
-      <bufferGeometry ref={geoRef} />
-      <lineBasicMaterial
-        color={color}
-        transparent
-        opacity={isDimmed ? 0.03 : isHighlighted ? 0.7 : 0.15}
-        linewidth={1}
-      />
-    </line>
+  const opacity = isDimmed ? 0.03 : isHighlighted ? 0.7 : 0.15;
+
+  useFrame(() => {
+    if (lineRef.current) {
+      const geo = lineRef.current.geometry;
+      const positions = new Float32Array([
+        (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08,
+        (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08,
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.attributes.position.needsUpdate = true;
+    }
+  });
+
+  // Build initial geometry
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array([0, 0, 0, 0, 0, 0]);
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
+
+  const material = useMemo(
+    () => new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
+    [color, opacity]
   );
+
+  return <lineSegments ref={lineRef} geometry={geometry} material={material} />;
 }
 
 function ClusterLabel({ cluster }: { cluster: Cluster }) {
