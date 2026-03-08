@@ -16,6 +16,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Users, Clock, ChevronDown as ChevDown } from 'lucide-react';
 import { ArgdownType } from '@/types/discussion';
 import DeliberationPanel from '@/components/deliberation/DeliberationPanel';
+import { useAnalysis, AIAnalysis } from '@/hooks/useAnalysis';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import OverviewView from '@/components/discussion/OverviewView';
+import ArgumentMapView from '@/components/discussion/ArgumentMapView';
+import { Topic, ArgumentNode, Tension, ArgumentCluster, OpenQuestion, GuidanceItem, DiscussionSummaryData, EmergingProposal } from '@/types/discussion';
 
 const argdownColors: Partial<Record<string, string>> = {
   claim: 'text-argdown-claim', support: 'text-argdown-support', objection: 'text-argdown-objection',
