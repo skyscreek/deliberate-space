@@ -65,6 +65,17 @@
     --argdown-alternative: 270 45% 50%;
     --argdown-question: 32 80% 44%;
     --argdown-proposal: 195 65% 42%;
+
+    --graph-bg: 220 15% 8%;
+    --graph-cluster-1: 340 70% 55%;
+    --graph-cluster-2: 160 60% 45%;
+    --graph-cluster-3: 45 80% 55%;
+    --graph-cluster-4: 270 55% 58%;
+    --graph-cluster-5: 195 70% 50%;
+    --graph-cluster-6: 15 75% 55%;
+    --graph-node-default: 0 0% 55%;
+    --graph-edge: 0 0% 30%;
+    --graph-label: 0 0% 85%;
   }
 
   .dark {
@@ -125,6 +136,17 @@
     --argdown-alternative: 270 40% 58%;
     --argdown-question: 32 70% 50%;
     --argdown-proposal: 195 60% 52%;
+
+    --graph-bg: 220 15% 8%;
+    --graph-cluster-1: 340 70% 60%;
+    --graph-cluster-2: 160 55% 50%;
+    --graph-cluster-3: 45 75% 58%;
+    --graph-cluster-4: 270 50% 62%;
+    --graph-cluster-5: 195 65% 55%;
+    --graph-cluster-6: 15 70% 58%;
+    --graph-node-default: 0 0% 50%;
+    --graph-edge: 0 0% 25%;
+    --graph-label: 0 0% 90%;
   }
 }
 
