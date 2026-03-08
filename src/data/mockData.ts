@@ -1,4 +1,4 @@
-import { Topic, TopicMeta } from '@/types/discussion';
+import { Topic, TopicMeta, ArgumentNode } from '@/types/discussion';
 
 const authors = {
   maria: { id: 'a1', name: 'Maria Chen', avatar: '👩‍💼', role: 'Urban Planner' },
@@ -13,6 +13,164 @@ const authors = {
   david: { id: 'a10', name: 'David Kim', avatar: '🧑‍⚖️', role: 'City Council Aide' },
 };
 
+const argumentMap: ArgumentNode[] = [
+  {
+    id: 'am-1',
+    type: 'claim',
+    text: 'Congestion pricing will reduce downtown traffic by 15–25% and improve air quality',
+    author: 'Maria Chen',
+    relatedPostIds: ['p1'],
+    children: [
+      {
+        id: 'am-1-1',
+        type: 'support',
+        text: 'Evidence from London, Stockholm, and Singapore confirms significant traffic reduction',
+        author: 'Maria Chen',
+        relatedPostIds: ['p1'],
+        children: [
+          {
+            id: 'am-1-1-1',
+            type: 'concern',
+            text: 'Stockholm had much better transit infrastructure before pricing — our city doesn\'t',
+            author: 'Sarah Johansson',
+            relatedPostIds: ['p1'],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: 'am-1-2',
+        type: 'support',
+        text: 'Pediatric asthma rates downtown are 40% above city average — health costs of inaction are real',
+        author: 'Linda Vasquez',
+        relatedPostIds: ['p3'],
+        children: [],
+      },
+      {
+        id: 'am-1-3',
+        type: 'objection',
+        text: 'The $9 fee is effectively a tax on people who have no transit alternative',
+        author: 'James Okafor',
+        relatedPostIds: ['p2'],
+        children: [
+          {
+            id: 'am-1-3-1',
+            type: 'support',
+            text: 'Bus routes to suburbs were cut 3 years ago — many commuters have zero alternative',
+            author: 'James Okafor',
+            relatedPostIds: ['p2'],
+            children: [],
+          },
+          {
+            id: 'am-1-3-2',
+            type: 'support',
+            text: 'For minimum wage workers, the fee is a much bigger share of income',
+            author: 'Tom Brennan',
+            relatedPostIds: ['p7'],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: 'am-1-4',
+        type: 'objection',
+        text: 'Small businesses will suffer from higher delivery costs and reduced foot traffic',
+        author: 'Tom Brennan',
+        relatedPostIds: ['p4'],
+        children: [
+          {
+            id: 'am-1-4-1',
+            type: 'question',
+            text: 'Has anyone modeled the economic impact on local businesses?',
+            author: 'Tom Brennan',
+            relatedPostIds: ['p4'],
+            children: [],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'am-2',
+    type: 'proposal',
+    text: 'Phased approach: start at $4–5, invest in transit for 2 years, then raise to $9',
+    author: 'Sarah Johansson',
+    relatedPostIds: ['p10'],
+    children: [
+      {
+        id: 'am-2-1',
+        type: 'support',
+        text: 'Addresses the "no alternative" problem while still making progress',
+        author: 'Sarah Johansson',
+        relatedPostIds: ['p10'],
+        children: [],
+      },
+      {
+        id: 'am-2-2',
+        type: 'concern',
+        text: 'Lower initial fee may not generate enough revenue for meaningful transit improvements',
+        relatedPostIds: [],
+        children: [],
+      },
+    ],
+  },
+  {
+    id: 'am-3',
+    type: 'claim',
+    text: 'Exemptions and equity measures are essential for the policy to be fair',
+    relatedPostIds: ['p5', 'p9'],
+    children: [
+      {
+        id: 'am-3-1',
+        type: 'support',
+        text: 'Disabled residents depend on door-to-door car transport — full exemptions needed',
+        author: 'Aisha Patel',
+        relatedPostIds: ['p5'],
+        children: [],
+      },
+      {
+        id: 'am-3-2',
+        type: 'support',
+        text: 'Delivery drivers will absorb costs — commercial exemptions or reduced rates needed',
+        author: 'Mike DeLuca',
+        relatedPostIds: ['p8'],
+        children: [],
+      },
+      {
+        id: 'am-3-3',
+        type: 'concern',
+        text: '200% poverty line threshold creates a cliff effect that hurts the working poor',
+        author: 'Aisha Patel',
+        relatedPostIds: ['p9'],
+        children: [],
+      },
+      {
+        id: 'am-3-4',
+        type: 'question',
+        text: 'How will revenue allocation be enforced and made accountable?',
+        author: 'Chen Wei',
+        relatedPostIds: ['p6'],
+        children: [],
+      },
+    ],
+  },
+  {
+    id: 'am-4',
+    type: 'alternative',
+    text: 'Consider parking reform, employer levies, or other mechanisms instead',
+    relatedPostIds: [],
+    children: [
+      {
+        id: 'am-4-1',
+        type: 'question',
+        text: 'Could the same goals be achieved without congestion pricing?',
+        relatedPostIds: [],
+        children: [],
+      },
+    ],
+  },
+];
+
 export const congestionTopic: Topic = {
   id: 'topic-1',
   title: 'Should the city implement a congestion pricing zone?',
@@ -24,7 +182,54 @@ export const congestionTopic: Topic = {
   postCount: 10,
   proposal: `The city council is considering a congestion pricing zone covering the downtown core. Vehicles entering the zone during peak hours (7–10 AM, 4–7 PM) would pay a $9 daily fee. Revenue would fund public transit expansion and cycling infrastructure.\n\nThis discussion aims to gather community perspectives before the public hearing on April 15th. We want to understand: Who benefits? Who is harmed? What conditions would make this acceptable? What alternatives should be considered?`,
 
-  summary: 'The discussion is polarized between economic concerns (especially for low-income commuters and small businesses) and environmental/transit benefits. There is emerging agreement that exemptions and revenue allocation are key design questions, but specific proposals for equity measures remain underdeveloped.',
+  summary: {
+    text: 'The discussion is polarized between economic concerns and environmental benefits. There is emerging agreement that exemptions and revenue allocation are key design questions. A phased approach is gaining traction as a compromise.',
+    positions: [
+      { authorName: 'Maria Chen', position: 'Supports pricing based on international evidence showing 15–25% traffic reduction', postId: 'p1' },
+      { authorName: 'James Okafor', position: 'Opposes the fee as a regressive tax on commuters without transit alternatives', postId: 'p2' },
+      { authorName: 'Linda Vasquez', position: 'Argues health costs of inaction disproportionately affect low-income communities', postId: 'p3' },
+      { authorName: 'Tom Brennan', position: 'Warns about economic impact on small businesses and delivery costs', postId: 'p4' },
+      { authorName: 'Aisha Patel', position: 'Demands full exemptions for disabled residents and caregivers', postId: 'p5' },
+      { authorName: 'Sarah Johansson', position: 'Proposes a phased approach starting with lower fees', postId: 'p10' },
+    ],
+    tensions: [], // will be filled from topic tensions
+    openQuestions: [], // will be filled from topic openQuestions
+    emergingProposals: [
+      {
+        id: 'ep-1',
+        title: 'Phased pricing with transit investment first',
+        description: 'Start at $4–5, invest revenue in transit for 2 years, then raise to $9 once alternatives exist.',
+        supportedBy: ['Sarah Johansson'],
+        relatedPostIds: ['p10'],
+      },
+      {
+        id: 'ep-2',
+        title: 'Broad exemptions with sliding scale',
+        description: 'Exemptions for disabled residents, caregivers, and a sliding scale replacing the hard poverty-line cutoff.',
+        supportedBy: ['Aisha Patel', 'David Kim'],
+        relatedPostIds: ['p5', 'p9'],
+      },
+    ],
+  },
+
+  emergingProposals: [
+    {
+      id: 'ep-1',
+      title: 'Phased pricing with transit investment first',
+      description: 'Start at $4–5, invest revenue in transit for 2 years, then raise to $9 once alternatives exist.',
+      supportedBy: ['Sarah Johansson'],
+      relatedPostIds: ['p10'],
+    },
+    {
+      id: 'ep-2',
+      title: 'Broad exemptions with sliding scale',
+      description: 'Exemptions for disabled residents, caregivers, and a sliding scale replacing the hard poverty-line cutoff.',
+      supportedBy: ['Aisha Patel', 'David Kim'],
+      relatedPostIds: ['p5', 'p9'],
+    },
+  ],
+
+  argumentMap,
 
   posts: [
     {
@@ -257,18 +462,21 @@ export const congestionTopic: Topic = {
       id: 'q1',
       question: 'Has anyone modeled the economic impact on local downtown businesses?',
       raisedInPostId: 'p4',
+      raisedBy: 'Tom Brennan',
       relatedPostIds: ['p4', 'p8'],
     },
     {
       id: 'q2',
       question: 'How will revenue allocation be enforced and made accountable?',
       raisedInPostId: 'p6',
+      raisedBy: 'Chen Wei',
       relatedPostIds: ['p6', 'p9'],
     },
     {
       id: 'q3',
       question: 'Is a phased approach with lower initial fees politically and practically viable?',
       raisedInPostId: 'p10',
+      raisedBy: 'Sarah Johansson',
       relatedPostIds: ['p10', 'p9'],
     },
   ],
@@ -297,6 +505,24 @@ export const congestionTopic: Topic = {
       type: 'gap',
       label: 'Alternative revenue models unexplored',
       description: 'Could the same goals be achieved through parking reform, employer levies, or other mechanisms? No one has compared alternatives.',
+    },
+    {
+      id: 'g5',
+      type: 'missing-counterargument',
+      label: 'No rebuttal to phased approach',
+      description: 'Sarah\'s phased proposal has strong support but no one has raised potential downsides or risks.',
+    },
+    {
+      id: 'g6',
+      type: 'missing-alternative',
+      label: 'No non-pricing alternatives proposed',
+      description: 'All discussion assumes some form of pricing. What about congestion-reducing alternatives like remote work incentives or staggered hours?',
+    },
+    {
+      id: 'g7',
+      type: 'unresolved-question',
+      label: 'Accountability mechanism undefined',
+      description: 'Chen Wei asked how revenue oversight would work. David mentioned a board but specifics are missing.',
     },
   ],
 };
@@ -337,7 +563,6 @@ export const stubTopics: TopicMeta[] = [
   },
 ];
 
-// Mini-deliberation data for stub topics on home page
 export const topicDeliberationPreviews: Record<string, { tensions: number; openQuestions: number; topCluster: string; summary: string }> = {
   'topic-1': {
     tensions: 3,
