@@ -59,10 +59,10 @@ function ThreadLine({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group flex justify-center w-5 shrink-0 cursor-pointer py-1"
+      className="group flex justify-center w-6 flex-1 shrink-0 cursor-pointer py-0.5 min-h-[24px]"
       aria-label="Collapse thread"
     >
-      <div className="w-0.5 h-full bg-border group-hover:bg-foreground/40 transition-colors rounded-full" />
+      <div className="w-0.5 h-full bg-border/80 group-hover:bg-foreground/50 transition-colors rounded-full" />
     </button>
   );
 }
@@ -132,21 +132,19 @@ function ReplyBranch({ reply, depth = 0 }: { reply: Reply; depth?: number }) {
   };
 
   return (
-    <div className="flex gap-0">
+    <div className="flex">
       {/* Left column: toggle or thread line */}
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center w-6 shrink-0">
         {collapsed ? (
-          <div className="pt-1.5">
+          <div className="pt-1">
             <CollapseToggle collapsed onClick={() => setCollapsed(false)} />
           </div>
         ) : (
           <>
-            <div className="pt-1.5">
+            <div className="pt-1">
               <Avatar name={reply.author.name} color={reply.author.color} size="sm" />
             </div>
-            {hasChildren && (
-              <ThreadLine onClick={() => setCollapsed(true)} />
-            )}
+            <ThreadLine onClick={() => setCollapsed(true)} />
           </>
         )}
       </div>
@@ -241,9 +239,9 @@ export default function PostCard({ post }: { post: Post }) {
     >
       <div className="p-4 sm:p-5">
         {/* Top-level post uses same layout pattern */}
-        <div className="flex gap-0">
+        <div className="flex">
           {/* Left column */}
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center w-8 shrink-0">
             {collapsed ? (
               <div className="pt-0.5">
                 <CollapseToggle collapsed onClick={() => setCollapsed(false)} />
@@ -251,9 +249,7 @@ export default function PostCard({ post }: { post: Post }) {
             ) : (
               <>
                 <Avatar name={post.author.name} color={post.author.color} />
-                {post.replies.length > 0 && (
-                  <ThreadLine onClick={() => setCollapsed(true)} />
-                )}
+                <ThreadLine onClick={() => setCollapsed(true)} />
               </>
             )}
           </div>
