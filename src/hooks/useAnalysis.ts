@@ -74,10 +74,14 @@ export function useRunAnalysis() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as AIAnalysis;
+      return { analysis: data as AIAnalysis, topicId };
     },
-    onSuccess: (_, topicId) => {
-      queryClient.invalidateQueries({ queryKey: ['analysis', topicId] });
+    onSuccess: ({ analysis, topicId }) => {
+      // Set the analysis data directly in the cache so the UI updates immediately
+      queryClient.setQueryData(['analysis', topicId], {
+        analysis,
+        createdAt: new Date().toISOString(),
+      });
     },
   });
 }

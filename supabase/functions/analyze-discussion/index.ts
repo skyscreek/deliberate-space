@@ -196,7 +196,6 @@ Rules:
     }
 
     // Store in ai_analyses — upsert by topic_id + analysis_type
-    // First check if exists
     const { data: existing } = await supabase
       .from("ai_analyses")
       .select("id")
@@ -205,17 +204,19 @@ Rules:
       .maybeSingle();
 
     if (existing) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from("ai_analyses")
         .update({ content: analysis, model: "google/gemini-3-flash-preview", created_at: new Date().toISOString() })
         .eq("id", existing.id);
+      if (updateErr) console.error("Failed to update ai_analyses:", JSON.stringify(updateErr));
     } else {
-      await supabase.from("ai_analyses").insert({
+      const { error: insertErr } = await supabase.from("ai_analyses").insert({
         topic_id,
         analysis_type: "full",
         content: analysis,
         model: "google/gemini-3-flash-preview",
       });
+      if (insertErr) console.error("Failed to insert ai_analyses:", JSON.stringify(insertErr));
     }
 
     return new Response(JSON.stringify(analysis), {
