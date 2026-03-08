@@ -161,22 +161,23 @@ export default function OverviewView({ topic, onSwitchToThread }: Props) {
                   />
                 ))}
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
+              <div className="flex gap-0.5 mt-1.5">
                 {Object.entries(argCounts).map(([type, count]) => (
                   <button
                     key={type}
                     onClick={() => setHighlightedType(highlightedType === type ? null : type)}
+                    style={{ width: `${(count / total) * 100}%` }}
                     className={cn(
-                      'flex items-center gap-1.5 text-[11px] capitalize transition-all duration-150 rounded px-1.5 py-0.5 -mx-1.5',
+                      'flex items-center justify-center gap-1 text-[10px] capitalize transition-all duration-150 truncate',
                       highlightedType === type
-                        ? 'text-foreground font-medium bg-accent'
+                        ? 'text-foreground font-medium'
                         : highlightedType
-                          ? 'text-muted-foreground/50 hover:text-muted-foreground'
+                          ? 'text-muted-foreground/40'
                           : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    <span className={cn('inline-block w-2 h-2 rounded-full shrink-0', colorMap[type] || 'bg-muted')} />
-                    {type} {count}
+                    <span className={cn('inline-block w-1.5 h-1.5 rounded-full shrink-0', colorMap[type] || 'bg-muted')} />
+                    <span className="truncate">{type} {count}</span>
                   </button>
                 ))}
               </div>
