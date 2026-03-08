@@ -161,8 +161,6 @@ function EdgeLine({
   isDimmed: boolean;
   isHighlighted: boolean;
 }) {
-  const lineRef = useRef<THREE.Line>(null!);
-
   const color = sameCluster
     ? CLUSTER_THREE_COLORS[clusterIdx % CLUSTER_THREE_COLORS.length]
     : new THREE.Color('#aaa');
@@ -178,15 +176,6 @@ function EdgeLine({
     () => new THREE.LineBasicMaterial({ color, transparent: true, opacity }),
     [color, opacity]
   );
-
-  useFrame(() => {
-    if (!lineRef.current) return;
-    const geo = lineRef.current.geometry;
-    const pos = geo.attributes.position as THREE.BufferAttribute;
-    pos.setXYZ(0, (source.x ?? 0) * 0.08, (source.y ?? 0) * -0.08, (source.z ?? 0) * 0.08);
-    pos.setXYZ(1, (target.x ?? 0) * 0.08, (target.y ?? 0) * -0.08, (target.z ?? 0) * 0.08);
-    pos.needsUpdate = true;
-  });
 
   const lineObj = useMemo(() => {
     const l = new THREE.Line(geometry, material);
