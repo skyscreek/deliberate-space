@@ -1,7 +1,7 @@
 import { GuidanceItem } from '@/types/discussion';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, AlertTriangle, Search, Eye, MessageSquareWarning, ArrowRightLeft, HelpCircle, ChevronDown } from 'lucide-react';
+import { Lightbulb, AlertTriangle, Search, Eye, MessageSquare, ArrowRightLeft, HelpCircle, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,7 @@ const guidanceIcons: Record<string, typeof Lightbulb> = {
   'evidence-needed': Search,
   'missing-perspective': Eye,
   gap: Lightbulb,
-  'missing-counterargument': MessageSquareWarning,
+  'missing-counterargument': MessageSquare,
   'missing-alternative': ArrowRightLeft,
   'unresolved-question': HelpCircle,
 };
