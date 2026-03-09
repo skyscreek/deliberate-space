@@ -9,7 +9,10 @@ import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap } from 'lucide-react';
+import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { useCreateSuggestedDiscussion } from '@/hooks/useCreateSuggestedDiscussion';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 /* ── Canvas — warm charcoal, not pure black ── */
 const CANVAS_BG = 'hsl(222 10% 14%)';
