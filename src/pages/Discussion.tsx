@@ -1,19 +1,19 @@
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback, forwardRef } from 'react';
 import { useTopic } from '@/hooks/useTopics';
 import { usePosts, useCreatePost, useVote, PostRow } from '@/hooks/usePosts';
 import { useAuth } from '@/context/AuthContext';
 import { DiscussionProvider, useDiscussion } from '@/context/DiscussionContext';
-import { ArrowLeft, MessageSquare, Sparkles, Loader2, ChevronUp, ChevronDown, Plus, Minus, X, CornerDownRight, Tag } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Sparkles, Loader2, ChevronUp, ChevronDown, Plus, Minus, X, CornerDownRight, Tag, Users, Clock, ChevronDown as ChevDown, Trash2 } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
-import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Clock, ChevronDown as ChevDown } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useDeleteTopic } from '@/hooks/useDeleteTopic';
 import { ArgdownType } from '@/types/discussion';
 import DeliberationPanel from '@/components/deliberation/DeliberationPanel';
 import { useAnalysis, AIAnalysis } from '@/hooks/useAnalysis';
@@ -441,14 +441,33 @@ function TopLevelComposer({ topicId }: { topicId: string }) {
   );
 }
 
-function TopicHeaderLive({ topic }: { topic: { title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string; username?: string }; created_at: string; post_count?: number; participant_count?: number } }) {
+function TopicHeaderLive({ topic }: { topic: { id?: string; title: string; description: string; proposal: string | null; category: string; status: string; author_id: string; author_profile?: { display_name: string; username?: string }; created_at: string; post_count?: number; participant_count?: number } }) {
   const [open, setOpen] = useState(true);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const deleteTopic = useDeleteTopic();
+
   const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'text-vote-up font-semibold' },
     'seeking-consensus': { label: 'Seeking Consensus', className: 'text-highlight font-semibold' },
     resolved: { label: 'Resolved', className: 'text-primary font-semibold' },
   };
   const status = statusConfig[topic.status] || statusConfig.active;
+
+  const canDelete = !!user && user.id === topic.author_id && !!topic.id;
+
+  const handleDelete = async () => {
+    if (!topic.id) return;
+    try {
+      await deleteTopic.mutateAsync({ topicId: topic.id });
+      toast({ title: 'Topic deleted', description: 'It’s now hidden from the list.' });
+      navigate('/');
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err.message, variant: 'destructive' });
+    }
+  };
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -475,6 +494,34 @@ function TopicHeaderLive({ topic }: { topic: { title: string; description: strin
               <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDistanceToNow(new Date(topic.created_at), { addSuffix: true })}</span>
               <span className="flex items-center gap-1"><Users className="h-3 w-3" />{topic.participant_count ?? 0}</span>
               <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{topic.post_count ?? 0} posts</span>
+              {canDelete && (
+                <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="ml-auto h-7 text-[11px] gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this topic?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will hide the topic from the main list. (Existing posts won’t be removed.)
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete} disabled={deleteTopic.isPending}>
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </div>
         </CollapsibleContent>

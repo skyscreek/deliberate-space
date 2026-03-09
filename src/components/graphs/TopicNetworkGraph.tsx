@@ -13,7 +13,11 @@ import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles,
 import { useCreateSuggestedDiscussion } from '@/hooks/useCreateSuggestedDiscussion';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 /* ── Canvas — warm charcoal, not pure black ── */
 const CANVAS_BG = 'hsl(222 10% 14%)';
 const PANEL_BG = 'hsla(222, 10%, 17%, 0.94)';
@@ -110,20 +114,41 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const { user } = useAuth();
   const { mutateAsync: createSuggested, isPending: isCreating } = useCreateSuggestedDiscussion();
 
-  const handleCreateSuggested = async (title: string, description: string, category: string, bridgeNodes: string[]) => {
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestDraft, setSuggestDraft] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    bridgeNodes: string[];
+  } | null>(null);
+
+  const openSuggestedDialog = (title: string, description: string, category: string, bridgeNodes: string[]) => {
     if (!user) {
-      toast({ title: "Sign in required", description: "You must be signed in to create a discussion.", variant: "destructive" });
+      toast({ title: 'Sign in required', description: 'You must be signed in to create a discussion.', variant: 'destructive' });
       return;
     }
+    setSuggestDraft({ title, description, category, bridgeNodes });
+    setSuggestOpen(true);
+  };
+
+  const handleConfirmCreateSuggested = async () => {
+    if (!suggestDraft) return;
     try {
-      const newTopic = await createSuggested({ title, description, category, bridgeNodes });
-      toast({ title: "Discussion created" });
+      const newTopic = await createSuggested({
+        title: suggestDraft.title,
+        description: suggestDraft.description,
+        category: suggestDraft.category,
+        bridgeNodes: suggestDraft.bridgeNodes,
+      });
+      setSuggestOpen(false);
+      setSuggestDraft(null);
+      toast({ title: 'Discussion created' });
       if (newTopic?.slug) {
         if (onOpenDiscussion) onOpenDiscussion(newTopic.slug);
         else navigate(`/d/${newTopic.slug}`);
       }
     } catch (err: any) {
-      toast({ title: "Error creating discussion", description: err.message, variant: "destructive" });
+      toast({ title: 'Error creating discussion', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -717,7 +742,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                 onClick={() => {
                   const title = gap.prompt;
                   const desc = `This discussion explores the intersection between ${gap.clusterA} and ${gap.clusterB}.`;
-                  handleCreateSuggested(title, desc, gap.clusterA, gap.bridgeNodes);
+                  openSuggestedDialog(title, desc, gap.clusterA, gap.bridgeNodes);
                 }}
                 disabled={isCreating}
                 className="w-full text-left group relative disabled:opacity-50 disabled:cursor-not-allowed">
@@ -807,7 +832,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                 onClick={() => {
                   const title = `How does ${concept(selectedNodeData.title)} inform ${selectedNodeData.bridgedClusters[0]} thinking?`;
                   const desc = `This discussion explores the intersection between ${selectedNodeData.title} and the broader themes of ${selectedNodeData.bridgedClusters[0]}.`;
-                  handleCreateSuggested(title, desc, selectedNodeData.bridgedClusters[0], [selectedNodeData.id]);
+                  openSuggestedDialog(title, desc, selectedNodeData.bridgedClusters[0], [selectedNodeData.id]);
                 }}
                 disabled={isCreating}
                 className="w-full text-left rounded-lg px-3 py-2 space-y-1 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed group relative block" 
@@ -836,6 +861,66 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
           </div>
         </div>
       )}
+
+      <Dialog
+        open={suggestOpen}
+        onOpenChange={(o) => {
+          setSuggestOpen(o);
+          if (!o) setSuggestDraft(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create suggested discussion</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Title</Label>
+              <Input
+                value={suggestDraft?.title ?? ''}
+                onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, title: e.target.value }) : d)}
+                placeholder="Discussion title"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Category</Label>
+              <Input
+                value={suggestDraft?.category ?? ''}
+                onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, category: e.target.value }) : d)}
+                placeholder="Category"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Textarea
+                value={suggestDraft?.description ?? ''}
+                onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, description: e.target.value }) : d)}
+                rows={3}
+                placeholder="What’s this discussion about?"
+              />
+            </div>
+
+            {!!suggestDraft?.bridgeNodes?.length && (
+              <p className="text-xs text-muted-foreground">
+                This will add {suggestDraft.bridgeNodes.length} relation link(s) to existing topics.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSuggestOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleConfirmCreateSuggested}
+              disabled={isCreating || !(suggestDraft?.title ?? '').trim() || !(suggestDraft?.category ?? '').trim()}
+            >
+              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
