@@ -79,57 +79,57 @@
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 92%;
+    --background: 222 15% 11%;
+    --foreground: 220 10% 92%;
 
-    --card: 0 0% 11%;
-    --card-foreground: 0 0% 92%;
+    --card: 222 15% 14%;
+    --card-foreground: 220 10% 92%;
 
-    --popover: 0 0% 11%;
-    --popover-foreground: 0 0% 92%;
+    --popover: 222 15% 14%;
+    --popover-foreground: 220 10% 92%;
 
-    --primary: 222 65% 60%;
-    --primary-foreground: 0 0% 7%;
+    --primary: 222 80% 65%;
+    --primary-foreground: 222 15% 11%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 92%;
+    --secondary: 222 15% 18%;
+    --secondary-foreground: 220 10% 92%;
 
-    --muted: 0 0% 17%;
-    --muted-foreground: 0 0% 55%;
+    --muted: 222 15% 18%;
+    --muted-foreground: 220 10% 65%;
 
-    --accent: 0 0% 17%;
-    --accent-foreground: 0 0% 92%;
+    --accent: 222 15% 20%;
+    --accent-foreground: 220 10% 92%;
 
-    --destructive: 0 55% 48%;
+    --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 222 65% 60%;
+    --border: 222 15% 22%;
+    --input: 222 15% 22%;
+    --ring: 222 80% 65%;
 
-    --sidebar-background: 0 0% 9%;
-    --sidebar-foreground: 0 0% 60%;
-    --sidebar-primary: 222 65% 60%;
+    --sidebar-background: 222 15% 12%;
+    --sidebar-foreground: 220 10% 65%;
+    --sidebar-primary: 222 80% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 92%;
-    --sidebar-border: 0 0% 17%;
-    --sidebar-ring: 222 65% 60%;
+    --sidebar-accent: 222 15% 18%;
+    --sidebar-accent-foreground: 220 10% 92%;
+    --sidebar-border: 222 15% 22%;
+    --sidebar-ring: 222 80% 65%;
 
     --vote-up: 152 45% 48%;
     --vote-down: 355 55% 55%;
-    --thread-line: 0 0% 26%;
+    --thread-line: 222 15% 26%;
     --highlight: 38 70% 50%;
-    --highlight-bg: 38 40% 14%;
+    --highlight-bg: 38 40% 16%;
 
-    --surface-raised: 0 0% 13%;
-    --surface-sunken: 0 0% 6%;
+    --surface-raised: 222 15% 16%;
+    --surface-sunken: 222 15% 9%;
 
-    --insights-bg: 0 0% 13%;
-    --insights-border: 0 0% 20%;
-    --insights-header: 0 0% 88%;
+    --insights-bg: 222 15% 16%;
+    --insights-border: 222 15% 24%;
+    --insights-header: 220 10% 88%;
 
-    --argdown-claim: 222 65% 60%;
+    --argdown-claim: 222 80% 65%;
     --argdown-support: 152 45% 48%;
     --argdown-objection: 355 55% 55%;
     --argdown-concern: 38 65% 52%;
@@ -137,16 +137,16 @@
     --argdown-question: 32 70% 50%;
     --argdown-proposal: 195 60% 52%;
 
-    --graph-bg: 220 15% 8%;
+    --graph-bg: 222 15% 10%;
     --graph-cluster-1: 340 70% 60%;
     --graph-cluster-2: 160 55% 50%;
     --graph-cluster-3: 45 75% 58%;
     --graph-cluster-4: 270 50% 62%;
     --graph-cluster-5: 195 65% 55%;
     --graph-cluster-6: 15 70% 58%;
-    --graph-node-default: 0 0% 50%;
-    --graph-edge: 0 0% 25%;
-    --graph-label: 0 0% 90%;
+    --graph-node-default: 220 10% 50%;
+    --graph-edge: 222 15% 28%;
+    --graph-label: 220 10% 90%;
   }
 }
 
