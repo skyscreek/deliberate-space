@@ -2,6 +2,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router-dom';
 import { LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function UserMenu() {
   const { user, profile, loading, signOut } = useAuth();
@@ -10,12 +11,15 @@ export default function UserMenu() {
 
   if (!user) {
     return (
-      <Link to="/auth">
-        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-          <LogIn className="h-3 w-3" />
-          Sign in
-        </Button>
-      </Link>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <Link to="/auth">
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+            <LogIn className="h-3 w-3" />
+            Sign in
+          </Button>
+        </Link>
+      </div>
     );
   }
 
@@ -24,6 +28,7 @@ export default function UserMenu() {
 
   return (
     <div className="flex items-center gap-2">
+      <ThemeToggle />
       <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
         <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">
           {initials}
