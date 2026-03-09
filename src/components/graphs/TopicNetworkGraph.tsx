@@ -237,284 +237,314 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
 
   // ─── Build graph + Sigma ───
   useEffect(() => {
-    if (!containerRef.current || topics.length === 0) return;
-    const graph = new Graph();
-    graphRef.current = graph;
+    const el = containerRef.current;
+    if (!el || topics.length === 0) return;
 
-    const includedNodes = new Set<string>();
-    if (mode === 'local' && currentTopicId) {
-      includedNodes.add(currentTopicId);
+    let alive = true;
+    let renderer: Sigma | null = null;
+
+    const waitForSize = async () => {
+      // Sigma can initialize while Tabs/Collapsible are still measuring, resulting in a 0x0 canvas.
+      // We wait a few frames until the container has a non-trivial size.
+      for (let i = 0; i < 60; i++) {
+        const { width, height } = el.getBoundingClientRect();
+        if (width > 20 && height > 20) return true;
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        if (!alive) return false;
+      }
+      return false;
+    };
+
+    (async () => {
+      const ready = await waitForSize();
+      if (!ready || !alive) return;
+
+      const graph = new Graph();
+      graphRef.current = graph;
+
+      const includedNodes = new Set<string>();
+      if (mode === 'local' && currentTopicId) {
+        includedNodes.add(currentTopicId);
+        for (const r of relations) {
+          if (r.source_topic_id === currentTopicId) includedNodes.add(r.target_topic_id);
+          if (r.target_topic_id === currentTopicId) includedNodes.add(r.source_topic_id);
+        }
+      } else {
+        for (const t of topics) includedNodes.add(t.id);
+      }
+
+      for (const t of topics) {
+        if (!includedNodes.has(t.id)) continue;
+        const cl = clusterMap.get(t.category) ?? 0;
+        const color = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
+        graph.addNode(t.id, {
+          label: concept(t.title),
+          fullTitle: t.title,
+          size: Math.max(6, Math.min(28, 6 + (t.post_count || 0) * 1.8)),
+          color, originalColor: color,
+          slug: t.slug, category: t.category, postCount: t.post_count || 0,
+          status: t.status, cluster: cl, forceLabel: false,
+        });
+      }
+
+      // ── Explicit edges ──
+      const nodeIds = new Set(topics.map(t => t.id));
+      const edgeSet = new Set<string>();
       for (const r of relations) {
-        if (r.source_topic_id === currentTopicId) includedNodes.add(r.target_topic_id);
-        if (r.target_topic_id === currentTopicId) includedNodes.add(r.source_topic_id);
-      }
-    } else {
-      for (const t of topics) includedNodes.add(t.id);
-    }
-
-    for (const t of topics) {
-      if (!includedNodes.has(t.id)) continue;
-      const cl = clusterMap.get(t.category) ?? 0;
-      const color = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
-      graph.addNode(t.id, {
-        label: concept(t.title),
-        fullTitle: t.title,
-        size: Math.max(6, Math.min(28, 6 + (t.post_count || 0) * 1.8)),
-        color, originalColor: color,
-        slug: t.slug, category: t.category, postCount: t.post_count || 0,
-        status: t.status, cluster: cl, forceLabel: false,
-      });
-    }
-
-    // ── Explicit edges ──
-    const nodeIds = new Set(topics.map(t => t.id));
-    const edgeSet = new Set<string>();
-    for (const r of relations) {
-      if (nodeIds.has(r.source_topic_id) && nodeIds.has(r.target_topic_id)) {
-        const eKey = [r.source_topic_id, r.target_topic_id].sort().join('|');
-        if (edgeSet.has(eKey)) continue;
-        edgeSet.add(eKey);
-        const srcCl = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
-        const tgtCl = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
-        const same = srcCl === tgtCl;
-        const srcColor = CLUSTER_PALETTE[srcCl % CLUSTER_PALETTE.length];
-        try {
-          graph.addEdge(r.source_topic_id, r.target_topic_id, {
-            size: same ? 2.5 : 1.8,
-            color: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
-            originalColor: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
-            originalSize: same ? 2.5 : 1.8,
-            type: 'line', isCrossCluster: !same, isInferred: false,
-          });
-        } catch { /* dup */ }
-      }
-    }
-
-    // ── Inferred edges: same-category topics without explicit connection ──
-    // This adds relational density even with sparse explicit relations
-    const byCategory = new Map<string, string[]>();
-    for (const t of topics) {
-      const arr = byCategory.get(t.category) || [];
-      arr.push(t.id);
-      byCategory.set(t.category, arr);
-    }
-    for (const [cat, ids] of byCategory.entries()) {
-      if (ids.length < 2) continue;
-      const cl = clusterMap.get(cat) ?? 0;
-      const clColor = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          const eKey = [ids[i], ids[j]].sort().join('|');
+        if (nodeIds.has(r.source_topic_id) && nodeIds.has(r.target_topic_id)) {
+          const eKey = [r.source_topic_id, r.target_topic_id].sort().join('|');
           if (edgeSet.has(eKey)) continue;
           edgeSet.add(eKey);
+          const srcCl = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
+          const tgtCl = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
+          const same = srcCl === tgtCl;
+          const srcColor = CLUSTER_PALETTE[srcCl % CLUSTER_PALETTE.length];
           try {
-            graph.addEdge(ids[i], ids[j], {
-              size: 1.0,
-              color: hex(clColor, 0.2),
-              originalColor: hex(clColor, 0.2),
-              originalSize: 1.0,
-              type: 'line', isCrossCluster: false, isInferred: true,
+            graph.addEdge(r.source_topic_id, r.target_topic_id, {
+              size: same ? 2.5 : 1.8,
+              color: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
+              originalColor: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
+              originalSize: same ? 2.5 : 1.8,
+              type: 'line', isCrossCluster: !same, isInferred: false,
             });
           } catch { /* dup */ }
         }
       }
-    }
 
-    // Layout
-    circular.assign(graph, { scale: 80 });
-    try {
-      const centralities = degreeCentrality(graph);
-      centralityMap.current = centralities;
-      const sorted = Object.entries(centralities).sort((a, b) => b[1] - a[1]);
-      const topN = Math.max(3, Math.ceil(topics.length * 0.3));
-      const important = new Set(sorted.slice(0, topN).map(([id]) => id));
-      importantNodes.current = important;
-      graph.forEachNode((node) => {
-        const sz = graph.getNodeAttribute(node, 'size') as number;
-        const c = centralities[node] || 0;
-        graph.setNodeAttribute(node, 'size', Math.max(6, sz + c * 24));
-        graph.setNodeAttribute(node, 'forceLabel', important.has(node));
-      });
-    } catch { /* ok */ }
-
-    forceAtlas2.assign(graph, {
-      iterations: 250,
-      settings: {
-        gravity: 3,
-        scalingRatio: 6,
-        barnesHutOptimize: true,
-        barnesHutTheta: 0.5,
-        strongGravityMode: false,
-        slowDown: 5,
-        outboundAttractionDistribution: true,
-        linLogMode: true,
-      },
-    });
-
-    // Custom label draw — no background box, text shadow for readability
-    function drawNodeLabel(
-      context: CanvasRenderingContext2D,
-      data: any,
-      settings: any,
-    ) {
-      if (!data.label) return;
-      const size = settings.labelSize;
-      const font = settings.labelFont;
-      const weight = settings.labelWeight || '500';
-      context.font = `${weight} ${size}px ${font}`;
-      context.fillStyle = (data as any).forceLabel
-        ? 'hsla(220, 10%, 88%, 0.95)'
-        : 'hsla(220, 10%, 75%, 0.75)';
-      context.shadowColor = 'hsla(222, 10%, 5%, 0.9)';
-      context.shadowBlur = 5;
-      context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
-      context.shadowColor = 'transparent';
-      context.shadowBlur = 0;
-    }
-
-    // Custom hover draw — dark background instead of white
-    function drawNodeHover(
-      context: CanvasRenderingContext2D,
-      data: any,
-      settings: any,
-    ) {
-      const size = settings.labelSize + 2;
-      const font = settings.labelFont;
-      const weight = '600';
-      const label = data.label || '';
-      if (!label) return;
-      context.font = `${weight} ${size}px ${font}`;
-      const textWidth = context.measureText(label).width;
-      const padding = 6;
-      const x = data.x + data.size + 3;
-      const y = data.y - size / 2 - padding;
-      // Dark rounded background
-      const radius = 4;
-      context.fillStyle = 'hsla(222, 10%, 12%, 0.92)';
-      context.beginPath();
-      context.roundRect(x - padding, y, textWidth + padding * 2, size + padding * 2, radius);
-      context.fill();
-      context.strokeStyle = 'hsla(222, 8%, 30%, 0.4)';
-      context.lineWidth = 1;
-      context.stroke();
-      // Text
-      context.fillStyle = 'hsla(220, 10%, 92%, 0.95)';
-      context.fillText(label, x, data.y + size / 3);
-    }
-
-
-    const renderer = new Sigma(graph, containerRef.current, {
-      renderEdgeLabels: false,
-      enableEdgeEvents: false,
-      defaultEdgeType: 'line',
-      labelFont: "'Inter', system-ui, sans-serif",
-      labelSize: 11,
-      labelWeight: '500',
-      labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
-      defaultDrawNodeLabel: drawNodeLabel,
-      defaultDrawNodeHover: drawNodeHover,
-      stagePadding: 60,
-      labelRenderedSizeThreshold: 7,
-      defaultNodeColor: '#556677',
-      defaultEdgeColor: '#2a3545',
-      labelDensity: 0.07,
-      labelGridCellSize: 200,
-      zIndex: true,
-    });
-    sigmaRef.current = renderer;
-
-    // If Sigma initializes while the container is hidden (Tabs/Collapsible), it can render a 0x0 canvas.
-    // Force a resize on the next frame to ensure the graph becomes visible.
-    requestAnimationFrame(() => {
-      try {
-        renderer.resize(true);
-        renderer.refresh();
-      } catch {
-        // no-op
+      // ── Inferred edges: same-category topics without explicit connection ──
+      // This adds relational density even with sparse explicit relations
+      const byCategory = new Map<string, string[]>();
+      for (const t of topics) {
+        const arr = byCategory.get(t.category) || [];
+        arr.push(t.id);
+        byCategory.set(t.category, arr);
       }
-    });
-
-    // ─── Focus+Context reducer ───
-    function applyReducers() {
-      const focus = hoveredRef.current || selectedRef.current;
-      if (!focus || !graph.hasNode(focus)) {
-        renderer.setSetting('nodeReducer', (_n: string, d: Partial<NodeDisplayData>) => ({ ...d }));
-        renderer.setSetting('edgeReducer', (_e: string, d: Partial<EdgeDisplayData>) => ({ ...d }));
-        renderer.refresh();
-        return;
-      }
-
-      const n1 = new Set(graph.neighbors(focus));
-      n1.add(focus);
-      const n2 = new Set<string>();
-      for (const nb of n1) {
-        if (nb === focus) continue;
-        for (const nb2 of graph.neighbors(nb)) {
-          if (!n1.has(nb2)) n2.add(nb2);
-        }
-      }
-
-      renderer.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
-        const r = { ...data };
-        const orig = graph.getNodeAttribute(node, 'originalColor') as string;
-        if (node === focus) {
-          r.highlighted = true; r.zIndex = 10;
-          (r as any).forceLabel = true;
-          r.label = graph.getNodeAttribute(node, 'fullTitle') as string;
-          r.size = ((data.size as number) || 6) * 1.6;
-          r.color = orig;
-        } else if (n1.has(node)) {
-          r.highlighted = true; r.zIndex = 5;
-          (r as any).forceLabel = true;
-          r.color = orig;
-          r.size = ((data.size as number) || 5) * 1.15;
-        } else if (n2.has(node)) {
-          r.color = hex(orig, 0.45); r.zIndex = 2;
-          if (importantNodes.current.has(node)) {
-            (r as any).forceLabel = true;
-          } else {
-            r.label = '';
+      for (const [cat, ids] of byCategory.entries()) {
+        if (ids.length < 2) continue;
+        const cl = clusterMap.get(cat) ?? 0;
+        const clColor = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
+        for (let i = 0; i < ids.length; i++) {
+          for (let j = i + 1; j < ids.length; j++) {
+            const eKey = [ids[i], ids[j]].sort().join('|');
+            if (edgeSet.has(eKey)) continue;
+            edgeSet.add(eKey);
+            try {
+              graph.addEdge(ids[i], ids[j], {
+                size: 1.0,
+                color: hex(clColor, 0.2),
+                originalColor: hex(clColor, 0.2),
+                originalSize: 1.0,
+                type: 'line', isCrossCluster: false, isInferred: true,
+              });
+            } catch { /* dup */ }
           }
-        } else {
-          r.color = hex(orig, 0.15); r.label = ''; r.zIndex = 0;
         }
-        return r;
+      }
+
+      // Layout
+      circular.assign(graph, { scale: 80 });
+      try {
+        const centralities = degreeCentrality(graph);
+        centralityMap.current = centralities;
+        const sorted = Object.entries(centralities).sort((a, b) => b[1] - a[1]);
+        const topN = Math.max(3, Math.ceil(topics.length * 0.3));
+        const important = new Set(sorted.slice(0, topN).map(([id]) => id));
+        importantNodes.current = important;
+        graph.forEachNode((node) => {
+          const sz = graph.getNodeAttribute(node, 'size') as number;
+          const c = centralities[node] || 0;
+          graph.setNodeAttribute(node, 'size', Math.max(6, sz + c * 24));
+          graph.setNodeAttribute(node, 'forceLabel', important.has(node));
+        });
+      } catch { /* ok */ }
+
+      forceAtlas2.assign(graph, {
+        iterations: 250,
+        settings: {
+          gravity: 3,
+          scalingRatio: 6,
+          barnesHutOptimize: true,
+          barnesHutTheta: 0.5,
+          strongGravityMode: false,
+          slowDown: 5,
+          outboundAttractionDistribution: true,
+          linLogMode: true,
+        },
       });
 
-      renderer.setSetting('edgeReducer', (edge: string, data: Partial<EdgeDisplayData>) => {
-        const r = { ...data };
-        const src = graph.source(edge), tgt = graph.target(edge);
-        const fc = graph.getNodeAttribute(focus, 'originalColor') as string;
-        if ((src === focus || tgt === focus) && n1.has(src) && n1.has(tgt)) {
-          r.color = hex(fc, 0.85); r.size = 3.5; r.zIndex = 5;
-        } else if (n1.has(src) && n1.has(tgt)) {
-          r.color = hex(fc, 0.4); r.size = 2; r.zIndex = 3;
-        } else if ((n1.has(src) || n1.has(tgt)) && (n2.has(src) || n2.has(tgt))) {
-          r.color = hex('#8899aa', 0.2); r.size = 1; r.zIndex = 1;
-        } else {
-          r.color = hex('#556677', 0.06); r.size = 0.4; r.zIndex = 0;
-        }
-        return r;
+      // Custom label draw — no background box, text shadow for readability
+      function drawNodeLabel(
+        context: CanvasRenderingContext2D,
+        data: any,
+        settings: any,
+      ) {
+        if (!data.label) return;
+        const size = settings.labelSize;
+        const font = settings.labelFont;
+        const weight = settings.labelWeight || '500';
+        context.font = `${weight} ${size}px ${font}`;
+        context.fillStyle = (data as any).forceLabel
+          ? 'hsla(220, 10%, 88%, 0.95)'
+          : 'hsla(220, 10%, 75%, 0.75)';
+        context.shadowColor = 'hsla(222, 10%, 5%, 0.9)';
+        context.shadowBlur = 5;
+        context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
+        context.shadowColor = 'transparent';
+        context.shadowBlur = 0;
+      }
+
+      // Custom hover draw — dark background instead of white
+      function drawNodeHover(
+        context: CanvasRenderingContext2D,
+        data: any,
+        settings: any,
+      ) {
+        const size = settings.labelSize + 2;
+        const font = settings.labelFont;
+        const weight = '600';
+        const label = data.label || '';
+        if (!label) return;
+        context.font = `${weight} ${size}px ${font}`;
+        const textWidth = context.measureText(label).width;
+        const padding = 6;
+        const x = data.x + data.size + 3;
+        const y = data.y - size / 2 - padding;
+        // Dark rounded background
+        const radius = 4;
+        context.fillStyle = 'hsla(222, 10%, 12%, 0.92)';
+        context.beginPath();
+        context.roundRect(x - padding, y, textWidth + padding * 2, size + padding * 2, radius);
+        context.fill();
+        context.strokeStyle = 'hsla(222, 8%, 30%, 0.4)';
+        context.lineWidth = 1;
+        context.stroke();
+        // Text
+        context.fillStyle = 'hsla(220, 10%, 92%, 0.95)';
+        context.fillText(label, x, data.y + size / 3);
+      }
+
+      renderer = new Sigma(graph, el, {
+        renderEdgeLabels: false,
+        enableEdgeEvents: false,
+        defaultEdgeType: 'line',
+        labelFont: "'Inter', system-ui, sans-serif",
+        labelSize: 11,
+        labelWeight: '500',
+        labelColor: { color: 'hsla(220, 10%, 80%, 0.85)' },
+        defaultDrawNodeLabel: drawNodeLabel,
+        defaultDrawNodeHover: drawNodeHover,
+        stagePadding: 60,
+        labelRenderedSizeThreshold: 7,
+        defaultNodeColor: '#556677',
+        defaultEdgeColor: '#2a3545',
+        labelDensity: 0.07,
+        labelGridCellSize: 200,
+        zIndex: true,
       });
-      renderer.refresh();
-    }
+      sigmaRef.current = renderer;
 
-    renderer.on('enterNode', ({ node }) => { hoveredRef.current = node; containerRef.current!.style.cursor = 'pointer'; applyReducers(); });
-    renderer.on('leaveNode', () => { hoveredRef.current = null; containerRef.current!.style.cursor = 'grab'; applyReducers(); });
-    renderer.on('clickNode', ({ node }) => {
-      const next = selectedRef.current === node ? null : node;
-      setSelectedNode(next); selectedRef.current = next; applyReducers();
-    });
-    renderer.on('doubleClickNode', ({ node, event }) => {
-      event.preventSigmaDefault();
-      const slug = graph.getNodeAttribute(node, 'slug') as string;
-      if (slug) { onOpenDiscussion ? onOpenDiscussion(slug) : navigate(`/d/${slug}`); }
-    });
-    renderer.on('clickStage', () => { setSelectedNode(null); selectedRef.current = null; applyReducers(); });
+      // Next frame resize fixes "blank canvas" when initialized right at mount
+      requestAnimationFrame(() => {
+        if (!renderer || !alive) return;
+        try {
+          renderer.resize(true);
+          renderer.refresh();
+        } catch {
+          // no-op
+        }
+      });
 
-    applyReducers();
-    containerRef.current!.style.cursor = 'grab';
-    return () => { renderer.kill(); sigmaRef.current = null; graphRef.current = null; };
+      // ─── Focus+Context reducer ───
+      function applyReducers() {
+        const focus = hoveredRef.current || selectedRef.current;
+        if (!focus || !graph.hasNode(focus)) {
+          renderer!.setSetting('nodeReducer', (_n: string, d: Partial<NodeDisplayData>) => ({ ...d }));
+          renderer!.setSetting('edgeReducer', (_e: string, d: Partial<EdgeDisplayData>) => ({ ...d }));
+          renderer!.refresh();
+          return;
+        }
+
+        const n1 = new Set(graph.neighbors(focus));
+        n1.add(focus);
+        const n2 = new Set<string>();
+        for (const nb of n1) {
+          if (nb === focus) continue;
+          for (const nb2 of graph.neighbors(nb)) {
+            if (!n1.has(nb2)) n2.add(nb2);
+          }
+        }
+
+        renderer!.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
+          const r = { ...data };
+          const orig = graph.getNodeAttribute(node, 'originalColor') as string;
+          if (node === focus) {
+            r.highlighted = true; r.zIndex = 10;
+            (r as any).forceLabel = true;
+            r.label = graph.getNodeAttribute(node, 'fullTitle') as string;
+            r.size = ((data.size as number) || 6) * 1.6;
+            r.color = orig;
+          } else if (n1.has(node)) {
+            r.highlighted = true; r.zIndex = 5;
+            (r as any).forceLabel = true;
+            r.color = orig;
+            r.size = ((data.size as number) || 5) * 1.15;
+          } else if (n2.has(node)) {
+            r.color = hex(orig, 0.45); r.zIndex = 2;
+            if (importantNodes.current.has(node)) {
+              (r as any).forceLabel = true;
+            } else {
+              r.label = '';
+            }
+          } else {
+            r.color = hex(orig, 0.15); r.label = ''; r.zIndex = 0;
+          }
+          return r;
+        });
+
+        renderer!.setSetting('edgeReducer', (edge: string, data: Partial<EdgeDisplayData>) => {
+          const r = { ...data };
+          const src = graph.source(edge), tgt = graph.target(edge);
+          const fc = graph.getNodeAttribute(focus, 'originalColor') as string;
+          if ((src === focus || tgt === focus) && n1.has(src) && n1.has(tgt)) {
+            r.color = hex(fc, 0.85); r.size = 3.5; r.zIndex = 5;
+          } else if (n1.has(src) && n1.has(tgt)) {
+            r.color = hex(fc, 0.4); r.size = 2; r.zIndex = 3;
+          } else if ((n1.has(src) || n1.has(tgt)) && (n2.has(src) || n2.has(tgt))) {
+            r.color = hex('#8899aa', 0.2); r.size = 1; r.zIndex = 1;
+          } else {
+            r.color = hex('#556677', 0.06); r.size = 0.4; r.zIndex = 0;
+          }
+          return r;
+        });
+        renderer!.refresh();
+      }
+
+      renderer.on('enterNode', ({ node }) => { hoveredRef.current = node; el.style.cursor = 'pointer'; applyReducers(); });
+      renderer.on('leaveNode', () => { hoveredRef.current = null; el.style.cursor = 'grab'; applyReducers(); });
+      renderer.on('clickNode', ({ node }) => {
+        const next = selectedRef.current === node ? null : node;
+        setSelectedNode(next); selectedRef.current = next; applyReducers();
+      });
+      renderer.on('doubleClickNode', ({ node, event }) => {
+        event.preventSigmaDefault();
+        const slug = graph.getNodeAttribute(node, 'slug') as string;
+        if (slug) { onOpenDiscussion ? onOpenDiscussion(slug) : navigate(`/d/${slug}`); }
+      });
+      renderer.on('clickStage', () => { setSelectedNode(null); selectedRef.current = null; applyReducers(); });
+
+      applyReducers();
+      el.style.cursor = 'grab';
+    })();
+
+    return () => {
+      alive = false;
+      try {
+        renderer?.kill();
+      } finally {
+        sigmaRef.current = null;
+        graphRef.current = null;
+      }
+    };
   }, [topics, relations, clusterMap, navigate, onOpenDiscussion, mode, currentTopicId]);
 
   useEffect(() => {
@@ -564,10 +594,14 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       expanded && 'fixed inset-0 z-50 rounded-none',
       fullHeight && 'h-full',
     )}>
-      <div ref={containerRef} className="w-full h-full" style={{
-        minHeight: fullHeight ? undefined : expanded ? '100vh' : (height || '560px'),
-        background: CANVAS_BG,
-      }} />
+      <div
+        ref={containerRef}
+        className="w-full"
+        style={{
+          height: fullHeight ? '100%' : expanded ? '100vh' : (height || '560px'),
+          background: CANVAS_BG,
+        }}
+      />
 
       {/* ── Top bar — search + expand only ── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end px-3 py-2 pointer-events-none">
