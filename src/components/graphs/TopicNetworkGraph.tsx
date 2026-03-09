@@ -9,7 +9,10 @@ import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap } from 'lucide-react';
+import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { useCreateSuggestedDiscussion } from '@/hooks/useCreateSuggestedDiscussion';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 
 /* ── Canvas — warm charcoal, not pure black ── */
 const CANVAS_BG = 'hsl(222 10% 14%)';
@@ -103,6 +106,26 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { mutateAsync: createSuggested, isPending: isCreating } = useCreateSuggestedDiscussion();
+
+  const handleCreateSuggested = async (title: string, description: string, category: string, bridgeNodes: string[]) => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "You must be signed in to create a discussion.", variant: "destructive" });
+      return;
+    }
+    try {
+      const newTopic = await createSuggested({ title, description, category, bridgeNodes });
+      toast({ title: "Discussion created" });
+      if (newTopic?.slug) {
+        if (onOpenDiscussion) onOpenDiscussion(newTopic.slug);
+        else navigate(`/d/${newTopic.slug}`);
+      }
+    } catch (err: any) {
+      toast({ title: "Error creating discussion", description: err.message, variant: "destructive" });
+    }
+  };
 
   const hoveredRef = useRef<string | null>(null);
   const selectedRef = useRef<string | null>(null);
@@ -690,7 +713,14 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
               <Sparkles className="h-3 w-3" style={{ color: '#e8b832aa' }} /> Bridge opportunities
             </div>
             {gaps.slice(0, 3).map(gap => (
-              <button key={gap.id} onClick={() => gap.bridgeNodes[0] && focusNode(gap.bridgeNodes[0])} className="w-full text-left group">
+              <button key={gap.id} 
+                onClick={() => {
+                  const title = gap.prompt;
+                  const desc = `This discussion explores the intersection between ${gap.clusterA} and ${gap.clusterB}.`;
+                  handleCreateSuggested(title, desc, gap.clusterA, gap.bridgeNodes);
+                }}
+                disabled={isCreating}
+                className="w-full text-left group relative disabled:opacity-50 disabled:cursor-not-allowed">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="w-2 h-2 rounded-full" style={{ background: gap.colorA }} />
                   <span className="text-[9px]" style={{ color: TEXT_DIM }}>{gap.clusterA}</span>
@@ -700,6 +730,11 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                 </div>
                 <p className="text-[11px] group-hover:opacity-100 opacity-70 transition-opacity leading-snug" style={{ color: TEXT_MED }}>{gap.prompt}</p>
                 <p className="text-[9px] mt-0.5" style={{ color: TEXT_DIM }}>{gap.context}</p>
+                {!user && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px] text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                    Sign in to create
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -768,14 +803,29 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             )}
 
             {selectedNodeData.bridgedClusters.length > 0 && (
-              <div className="rounded-lg px-3 py-2 space-y-1" style={{ background: 'hsla(45,80%,55%,0.06)', border: '1px solid hsla(45,80%,55%,0.1)' }}>
+              <button
+                onClick={() => {
+                  const title = `How does ${concept(selectedNodeData.title)} inform ${selectedNodeData.bridgedClusters[0]} thinking?`;
+                  const desc = `This discussion explores the intersection between ${selectedNodeData.title} and the broader themes of ${selectedNodeData.bridgedClusters[0]}.`;
+                  handleCreateSuggested(title, desc, selectedNodeData.bridgedClusters[0], [selectedNodeData.id]);
+                }}
+                disabled={isCreating}
+                className="w-full text-left rounded-lg px-3 py-2 space-y-1 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed group relative block" 
+                style={{ background: 'hsla(45,80%,55%,0.06)', border: '1px solid hsla(45,80%,55%,0.1)' }}
+              >
                 <span className="text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'hsla(45,80%,60%,0.6)' }}>
-                  <Plus className="h-2.5 w-2.5" /> Suggested discussion
+                  {isCreating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />} 
+                  Suggested discussion
                 </span>
-                <p className="text-[10px] leading-snug" style={{ color: TEXT_MED }}>
+                <p className="text-[10px] leading-snug group-hover:text-amber-100 transition-colors" style={{ color: TEXT_MED }}>
                   How does {concept(selectedNodeData.title)} inform {selectedNodeData.bridgedClusters[0]} thinking?
                 </p>
-              </div>
+                {!user && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px] text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                    Sign in to create
+                  </span>
+                )}
+              </button>
             )}
 
             <button onClick={() => handleOpen(selectedNodeData.slug)}
