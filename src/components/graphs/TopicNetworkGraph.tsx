@@ -108,6 +108,44 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedNode;
 
+  const prevTopicIdRef = useRef<string | undefined>(currentTopicId);
+
+  // Keep Sigma sized correctly when mounted inside hidden/animated containers (Tabs/Collapsible)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const ro = new ResizeObserver(() => {
+      sigmaRef.current?.resize();
+    });
+
+    ro.observe(el);
+
+    // Next-tick resize fixes "blank canvas" when Sigma initialized at 0x0
+    const t = window.setTimeout(() => sigmaRef.current?.resize(true), 0);
+
+    return () => {
+      window.clearTimeout(t);
+      ro.disconnect();
+    };
+  }, []);
+
+  // When switching topics in local mode, re-focus the new topic node
+  useEffect(() => {
+    if (mode !== 'local') {
+      prevTopicIdRef.current = currentTopicId;
+      return;
+    }
+    if (!currentTopicId) return;
+
+    if (prevTopicIdRef.current !== currentTopicId) {
+      prevTopicIdRef.current = currentTopicId;
+      setSelectedNode(currentTopicId);
+      selectedRef.current = currentTopicId;
+    }
+  }, [mode, currentTopicId]);
+
   const clusterMap = useMemo(() => {
     const unique = [...new Set(topics.map(t => t.category))];
     const m = new Map<string, number>();
