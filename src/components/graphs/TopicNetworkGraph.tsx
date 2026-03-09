@@ -423,6 +423,17 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     });
     sigmaRef.current = renderer;
 
+    // If Sigma initializes while the container is hidden (Tabs/Collapsible), it can render a 0x0 canvas.
+    // Force a resize on the next frame to ensure the graph becomes visible.
+    requestAnimationFrame(() => {
+      try {
+        renderer.resize(true);
+        renderer.refresh();
+      } catch {
+        // no-op
+      }
+    });
+
     // ─── Focus+Context reducer ───
     function applyReducers() {
       const focus = hoveredRef.current || selectedRef.current;
@@ -504,7 +515,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     applyReducers();
     containerRef.current!.style.cursor = 'grab';
     return () => { renderer.kill(); sigmaRef.current = null; graphRef.current = null; };
-  }, [topics, relations, clusterMap, navigate, onOpenDiscussion]);
+  }, [topics, relations, clusterMap, navigate, onOpenDiscussion, mode, currentTopicId]);
 
   useEffect(() => {
     selectedRef.current = selectedNode;
