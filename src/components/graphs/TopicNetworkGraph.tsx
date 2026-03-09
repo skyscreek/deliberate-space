@@ -108,6 +108,44 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedNode;
 
+  const prevTopicIdRef = useRef<string | undefined>(currentTopicId);
+
+  // Keep Sigma sized correctly when mounted inside hidden/animated containers (Tabs/Collapsible)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const ro = new ResizeObserver(() => {
+      sigmaRef.current?.resize();
+    });
+
+    ro.observe(el);
+
+    // Next-tick resize fixes "blank canvas" when Sigma initialized at 0x0
+    const t = window.setTimeout(() => sigmaRef.current?.resize(true), 0);
+
+    return () => {
+      window.clearTimeout(t);
+      ro.disconnect();
+    };
+  }, []);
+
+  // When switching topics in local mode, re-focus the new topic node
+  useEffect(() => {
+    if (mode !== 'local') {
+      prevTopicIdRef.current = currentTopicId;
+      return;
+    }
+    if (!currentTopicId) return;
+
+    if (prevTopicIdRef.current !== currentTopicId) {
+      prevTopicIdRef.current = currentTopicId;
+      setSelectedNode(currentTopicId);
+      selectedRef.current = currentTopicId;
+    }
+  }, [mode, currentTopicId]);
+
   const clusterMap = useMemo(() => {
     const unique = [...new Set(topics.map(t => t.category))];
     const m = new Map<string, number>();
@@ -385,6 +423,17 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     });
     sigmaRef.current = renderer;
 
+    // If Sigma initializes while the container is hidden (Tabs/Collapsible), it can render a 0x0 canvas.
+    // Force a resize on the next frame to ensure the graph becomes visible.
+    requestAnimationFrame(() => {
+      try {
+        renderer.resize(true);
+        renderer.refresh();
+      } catch {
+        // no-op
+      }
+    });
+
     // ─── Focus+Context reducer ───
     function applyReducers() {
       const focus = hoveredRef.current || selectedRef.current;
@@ -466,7 +515,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     applyReducers();
     containerRef.current!.style.cursor = 'grab';
     return () => { renderer.kill(); sigmaRef.current = null; graphRef.current = null; };
-  }, [topics, relations, clusterMap, navigate, onOpenDiscussion]);
+  }, [topics, relations, clusterMap, navigate, onOpenDiscussion, mode, currentTopicId]);
 
   useEffect(() => {
     selectedRef.current = selectedNode;
