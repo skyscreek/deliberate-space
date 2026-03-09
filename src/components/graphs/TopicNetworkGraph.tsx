@@ -594,10 +594,14 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       expanded && 'fixed inset-0 z-50 rounded-none',
       fullHeight && 'h-full',
     )}>
-      <div ref={containerRef} className="w-full h-full" style={{
-        minHeight: fullHeight ? undefined : expanded ? '100vh' : (height || '560px'),
-        background: CANVAS_BG,
-      }} />
+      <div
+        ref={containerRef}
+        className="w-full"
+        style={{
+          height: fullHeight ? '100%' : expanded ? '100vh' : (height || '560px'),
+          background: CANVAS_BG,
+        }}
+      />
 
       {/* ── Top bar — search + expand only ── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end px-3 py-2 pointer-events-none">
