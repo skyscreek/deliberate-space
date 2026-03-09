@@ -48,7 +48,7 @@ export function useCreateSuggestedDiscussion() {
         const relations = bridgeNodes.map(nodeId => ({
           source_topic_id: nodeId,
           target_topic_id: topic.id,
-          relation_type: 'bridges',
+          relation_type: 'related',
           created_by: user.id,
         }));
 
