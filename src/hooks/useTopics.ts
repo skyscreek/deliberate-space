@@ -23,6 +23,7 @@ async function fetchTopics(): Promise<TopicRow[]> {
   const { data: topics, error } = await supabase
     .from('topics')
     .select('*')
+    .neq('status', 'deleted')
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
@@ -80,6 +81,7 @@ async function fetchTopicBySlug(slug: string): Promise<TopicRow> {
     .from('topics')
     .select('*')
     .eq('slug', slug)
+    .neq('status', 'deleted')
     .single();
 
   if (error) throw error;
