@@ -8,198 +8,380 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, serviceKey);
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
-  const users = [
-    { id: "a1000001-0000-0000-0000-000000000001", display_name: "Jürgen Helbig", username: "juergen-helbig", bio: "Rentner, ehemaliger Ingenieur bei Siemens. 42 Jahre in Steglitz. CDU-nah, aber kein Parteisoldat.", location: "Berlin-Steglitz" },
-    { id: "a1000001-0000-0000-0000-000000000002", display_name: "Leyla Yıldırım", username: "leyla-yildirim", bio: "Sozialarbeiterin in Neukölln. Eltern kamen aus der Türkei, ich bin hier geboren. Integration heißt Teilhabe.", location: "Berlin-Neukölln" },
-    { id: "a1000001-0000-0000-0000-000000000003", display_name: "Franziska Berger", username: "franziska-berger", bio: "Stadtplanerin beim Bezirksamt Mitte. Versuche, evidenzbasierte Politik zu machen.", location: "Berlin-Mitte" },
-    { id: "a1000001-0000-0000-0000-000000000004", display_name: "Kevin Schröder", username: "kevin-schroeder", bio: "Lagerist bei DHL, alleinerziehend. Politik soll für Leute wie mich was bringen.", location: "Berlin-Marzahn" },
-    { id: "a1000001-0000-0000-0000-000000000005", display_name: "Dr. Carla Weiß", username: "carla-weiss", bio: "Professorin für Soziologie an der HU Berlin. Forschung: urbane Ungleichheit, Gentrifizierung.", location: "Berlin-Prenzlauer Berg" },
-    { id: "a1000001-0000-0000-0000-000000000006", display_name: "Markus Hoffmann", username: "markus-hoffmann", bio: "Gastronom, zwei Bars in Kreuzberg. Weniger Regulierung, mehr Eigenverantwortung. FDP-Wähler.", location: "Berlin-Kreuzberg" },
-    { id: "a1000001-0000-0000-0000-000000000007", display_name: "Sabine Krafft", username: "sabine-krafft", bio: "Grundschullehrerin, drei Kinder. Bin für pragmatische Lösungen, nicht für Ideologie.", location: "Berlin-Tempelhof" },
-    { id: "a1000001-0000-0000-0000-000000000008", display_name: "Amir Hassan", username: "amir-hassan", bio: "2015 aus Syrien gekommen, jetzt Fachinformatiker. Deutschland hat mir viel gegeben.", location: "Berlin-Wedding" },
-    { id: "a1000001-0000-0000-0000-000000000009", display_name: "Petra Nowak", username: "petra-nowak", bio: "Klimaaktivistin, Fridays for Future Berlin. Studentin der Umweltwissenschaften an der TU.", location: "Berlin-Friedrichshain" },
-    { id: "a1000001-0000-0000-0000-000000000010", display_name: "Thomas Brandt", username: "thomas-brandt", bio: "Taxifahrer seit 25 Jahren. Kenne jeden Kiez. Skeptisch gegenüber Ideologen.", location: "Berlin-Charlottenburg" },
+  // ── Step 1: Create real auth users and profiles ──
+  const seedUsers = [
+    { email: "juergen.helbig@seed.local", display_name: "Jürgen Helbig", bio: "Rentner, ehemaliger Ingenieur bei Siemens. 42 Jahre in Steglitz. CDU-nah, aber kein Parteisoldat.", location: "Berlin-Steglitz" },
+    { email: "leyla.yildirim@seed.local", display_name: "Leyla Yıldırım", bio: "Sozialarbeiterin in Neukölln. Eltern kamen aus der Türkei, ich bin hier geboren. Integration heißt Teilhabe.", location: "Berlin-Neukölln" },
+    { email: "franziska.berger@seed.local", display_name: "Franziska Berger", bio: "Stadtplanerin beim Bezirksamt Mitte. Versuche, evidenzbasierte Politik zu machen.", location: "Berlin-Mitte" },
+    { email: "kevin.schroeder@seed.local", display_name: "Kevin Schröder", bio: "Lagerist bei DHL, alleinerziehend. Politik soll für Leute wie mich was bringen.", location: "Berlin-Marzahn" },
+    { email: "carla.weiss@seed.local", display_name: "Dr. Carla Weiß", bio: "Professorin für Soziologie an der HU Berlin. Forschung: urbane Ungleichheit, Gentrifizierung.", location: "Berlin-Prenzlauer Berg" },
+    { email: "markus.hoffmann@seed.local", display_name: "Markus Hoffmann", bio: "Gastronom, zwei Bars in Kreuzberg. Weniger Regulierung, mehr Eigenverantwortung. FDP-Wähler.", location: "Berlin-Kreuzberg" },
+    { email: "sabine.krafft@seed.local", display_name: "Sabine Krafft", bio: "Grundschullehrerin, drei Kinder. Bin für pragmatische Lösungen, nicht für Ideologie.", location: "Berlin-Tempelhof" },
+    { email: "amir.hassan@seed.local", display_name: "Amir Hassan", bio: "2015 aus Syrien gekommen, jetzt Fachinformatiker. Deutschland hat mir viel gegeben.", location: "Berlin-Wedding" },
+    { email: "petra.nowak@seed.local", display_name: "Petra Nowak", bio: "Klimaaktivistin, Fridays for Future Berlin. Studentin der Umweltwissenschaften an der TU.", location: "Berlin-Friedrichshain" },
+    { email: "thomas.brandt@seed.local", display_name: "Thomas Brandt", bio: "Taxifahrer seit 25 Jahren. Kenne jeden Kiez. Skeptisch gegenüber Ideologen.", location: "Berlin-Charlottenburg" },
   ];
 
-  for (const u of users) {
-    await supabase.from("profiles").upsert({ user_id: u.id, display_name: u.display_name, username: u.username, bio: u.bio, location: u.location }, { onConflict: "user_id" });
+  const realUserIds: string[] = [];
+  for (const u of seedUsers) {
+    // Check if user already exists
+    const { data: existingUsers } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    const existing = existingUsers?.users?.find((eu: any) => eu.email === u.email);
+    if (existing) {
+      realUserIds.push(existing.id);
+      // Update profile
+      await supabase.from("profiles").update({ display_name: u.display_name, bio: u.bio, location: u.location }).eq("user_id", existing.id);
+      continue;
+    }
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: u.email,
+      password: "SeedUser2026!",
+      email_confirm: true,
+      user_metadata: { display_name: u.display_name },
+    });
+    if (error) {
+      console.error("Auth user error:", u.email, error.message);
+      continue;
+    }
+    realUserIds.push(data.user.id);
+    // Profile is auto-created by trigger, update it
+    await new Promise(r => setTimeout(r, 200));
+    await supabase.from("profiles").update({ display_name: u.display_name, bio: u.bio, location: u.location }).eq("user_id", data.user.id);
   }
 
-  const uid = (n: number) => users[n - 1].id;
+  if (realUserIds.length < 10) {
+    return new Response(JSON.stringify({ error: "Failed to create all users", created: realUserIds.length }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
 
+  const ADMIN = "993dd899-d553-478f-96f5-1c163f798027";
+  const uid = (n: number) => realUserIds[n - 1]; // 1-indexed
+
+  // ── Step 2: Create topics ──
   const topics = [
-    { id: "b2000001-0000-0000-0000-000000000001", title: "Friedrichstraße autofrei: Erfolgsmodell oder Geschäftskiller?", description: "Die autofreie Friedrichstraße ist seit 2024 dauerhaft. Einzelhändler klagen über Umsatzrückgänge, Radfahrer feiern die neue Freiheit.", proposal: "Die autofreie Zone ausweiten, mit Lieferzeitfenstern morgens von 6-9 Uhr.", category: "Mobilität", status: "active", author_id: uid(3), slug: "friedrichstrasse-autofrei" },
-    { id: "b2000001-0000-0000-0000-000000000002", title: "Mietendeckel 2.0: Braucht Berlin einen neuen Anlauf?", description: "Nach dem Scheitern des Mietendeckels vor dem BVerfG fordern viele einen bundesweiten Ansatz.", proposal: "Bundesgesetzlichen Mietendeckel einführen, max. 2% pro Jahr über Inflationsrate.", category: "Wohnen", status: "seeking-consensus", author_id: uid(5), slug: "mietendeckel-2-0-neuer-anlauf" },
-    { id: "b2000001-0000-0000-0000-000000000003", title: "Görlitzer Park: Mehr Polizei oder mehr Sozialarbeit?", description: "Der Görli bleibt Berlins umstrittenster Park. Zwischen Zaun-Debatte, Drogenhandel und Nutzungskonflikten.", proposal: "Integriertes Konzept aus Streetwork, Konsumräumen am Parkrand und gezielter Polizeipräsenz.", category: "Öffentliche Sicherheit", status: "active", author_id: uid(2), slug: "goerlitzer-park-polizei-oder-sozialarbeit" },
-    { id: "b2000001-0000-0000-0000-000000000004", title: "Integrationskurse reformieren: Was brauchen Neuankommende wirklich?", description: "Die bestehenden Integrationskurse gelten als bürokratisch und praxisfern.", proposal: "Dezentrale Kurse in Nachbarschaftszentren mit Kinderbetreuung und berufsbezogenen Modulen ab Tag 1.", category: "Integration", status: "active", author_id: uid(8), slug: "integrationskurse-reformieren" },
-    { id: "b2000001-0000-0000-0000-000000000005", title: "E-Scooter in Berlin: Regulieren, verbieten oder laufen lassen?", description: "Tausende E-Scooter blockieren Gehwege, landen im Kanal und verursachen Unfälle.", proposal: "Feste Abstellzonen, Höchstzahl pro Bezirk, Anbieter für Räumungskosten haftbar machen.", category: "Mobilität", status: "active", author_id: uid(7), slug: "e-scooter-berlin-regulieren" },
-    { id: "b2000001-0000-0000-0000-000000000006", title: "Müllproblem Neukölln: Warum versinkt der Bezirk im Dreck?", description: "Neukölln hat das größte Müllproblem aller Berliner Bezirke. Ursachen: hohe Dichte, zu wenig BSR, überforderte Hausverwaltungen, fehlendes Budget.", proposal: "Mehr BSR-Leerungen, Bußgelder für Hausverwaltungen, Kiezbotschafter, Pilotprojekt unterirdische Container.", category: "Stadtentwicklung", status: "active", author_id: uid(2), slug: "muellproblem-neukoelln" },
+    { title: "Friedrichstraße autofrei: Erfolgsmodell oder Geschäftskiller?", description: "Die autofreie Friedrichstraße ist seit 2024 dauerhaft. Einzelhändler klagen über Umsatzrückgänge, Radfahrer feiern die neue Freiheit.", proposal: "Die autofreie Zone ausweiten, mit Lieferzeitfenstern morgens von 6-9 Uhr.", category: "Mobilität", status: "active", author_id: uid(3) },
+    { title: "Müllproblem Neukölln: Warum versinkt der Bezirk im Dreck?", description: "Neukölln hat das größte Müllproblem aller Berliner Bezirke. Ursachen: hohe Dichte, zu wenig BSR, überforderte Hausverwaltungen, fehlendes Budget.", proposal: "Mehr BSR-Leerungen, Bußgelder für Hausverwaltungen, Kiezbotschafter, Pilotprojekt unterirdische Container.", category: "Stadtentwicklung", status: "active", author_id: uid(2) },
+    { title: "Berliner Schulen: Brauchen wir Sozialindex-basierte Finanzierung?", description: "Die Qualität der Berliner Schulen variiert massiv nach Bezirk. Der Vorschlag einer Sozialindex-basierten Finanzierung würde Schulen in benachteiligten Kiezen mehr Mittel zuweisen.", proposal: "Berliner Schulen nach Sozialindex finanzieren: Armut, Sprachförderungsbedarf und Fluktuation berücksichtigen.", category: "Bildung", status: "active", author_id: uid(2) },
   ];
 
-  for (const tp of topics) {
-    await supabase.from("topics").upsert(tp, { onConflict: "id" });
+  const topicIds: string[] = [];
+  for (const t of topics) {
+    const { data, error } = await supabase.from("topics").insert(t).select("id").single();
+    if (error) {
+      console.error("Topic error:", error.message);
+      // Try to find existing by title
+      const { data: existing } = await supabase.from("topics").select("id").eq("title", t.title).single();
+      if (existing) topicIds.push(existing.id);
+      continue;
+    }
+    topicIds.push(data.id);
   }
 
-  type P = { id: string; topic_id: string; author_id: string; content: string; argdown_type: string; parent_post_id?: string; depth?: number; created_at: string };
-  let pc = 0;
-  const pid = () => { pc++; return `c3000001-0000-0000-0000-00000000${pc.toString(16).padStart(4,"0")}`; };
-  const allPosts: P[] = [];
+  // ── Step 3: Build all posts ──
+  type PostRow = { topic_id: string; author_id: string; content: string; argdown_type: string; parent_post_id: string | null; depth: number; created_at: string };
+  const allPosts: PostRow[] = [];
+  const parentMap: Record<string, string> = {}; // localKey -> real id (filled after insert)
+  let postCounter = 0;
+
+  const tm = (day: number, h: number, m: number) => `2026-03-${day.toString().padStart(2, "0")}T${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:00+00:00`;
+
+  // Track which posts are replies to which index
+  type PostDef = { topic_id: string; author_id: string; content: string; argdown_type: string; parentIndex?: number; depth: number; created_at: string };
+  
+  const buildTopicPosts = (topicId: string, posts: Omit<PostDef, "topic_id">[]) => {
+    const startIdx = allPosts.length;
+    for (const p of posts) {
+      allPosts.push({
+        topic_id: topicId,
+        author_id: p.author_id,
+        content: p.content,
+        argdown_type: p.argdown_type,
+        parent_post_id: p.parentIndex !== undefined ? `__ref:${startIdx + p.parentIndex}` : null,
+        depth: p.depth,
+        created_at: p.created_at,
+      });
+    }
+  };
+
+  // ── T1: Friedrichstraße ──
+  if (topicIds[0]) {
+    buildTopicPosts(topicIds[0], [
+      // 0
+      { author_id: uid(10), content: "Ich fahre seit 25 Jahren Taxi durch Berlin. Die Friedrichstraße war vorher schon kein Vergnügen, aber jetzt ist das Chaos perfekt. Die Ausweichrouten sind komplett überlastet. Meine Fahrgäste zahlen mehr, weil ich Umwege fahren muss.", argdown_type: "concern", depth: 0, created_at: tm(10, 8, 12) },
+      // 1 - reply to 0
+      { author_id: uid(3), content: "Die Verkehrsdaten vom Senat zeigen, dass der Durchgangsverkehr insgesamt um 12% zurückgegangen ist. Ein Teil der Autofahrten findet einfach nicht mehr statt – die Leute steigen auf ÖPNV um.", argdown_type: "evidence", parentIndex: 0, depth: 1, created_at: tm(10, 8, 34) },
+      // 2 - reply to 1
+      { author_id: uid(10), content: "12% weniger Verkehr insgesamt klingt super, bis man in der Charlottenstraße im Stau steht und der Taxameter läuft. Statistik und Realität sind zwei Paar Schuhe.", argdown_type: "rebuttal", parentIndex: 1, depth: 2, created_at: tm(10, 8, 51) },
+      // 3
+      { author_id: uid(9), content: "Endlich kann man dort sicher Rad fahren! Vorher war die Friedrichstraße eine der gefährlichsten Straßen in Mitte. Drei Unfälle mit Schwerverletzten 2023. Seit der Sperrung: null.", argdown_type: "support", depth: 0, created_at: tm(10, 9, 5) },
+      // 4
+      { author_id: uid(6), content: "Mein Kollege hatte ein Restaurant an der Friedrichstraße. Musste schließen. 30% Umsatzrückgang in einem Jahr. Die Leute kommen einfach nicht mehr vorbei.", argdown_type: "objection", depth: 0, created_at: tm(10, 9, 22) },
+      // 5 - reply to 4
+      { author_id: uid(5), content: "Die Umsatzrückgänge sind real, aber multifaktoriell – Online-Handel, Inflation, Tourismus-Rückgang post-Corona. Vergleichbare Straßen ohne Sperrung hatten ähnliche Verluste.", argdown_type: "rebuttal", parentIndex: 4, depth: 1, created_at: tm(10, 9, 48) },
+      // 6
+      { author_id: uid(1), content: "Die Umsetzung war schlecht. Kein Konzept für Anwohner, keine Tiefgarage in der Nähe, keine vernünftige ÖPNV-Anbindung. Man kann nicht einfach Straßen sperren und hoffen, dass es funktioniert.", argdown_type: "concern", depth: 0, created_at: tm(10, 10, 3) },
+      // 7
+      { author_id: uid(7), content: "Als Mutter von drei Kindern: Ich muss meine Tochter manchmal zur Charité bringen. Vorher direkt über die Friedrichstraße, jetzt 20 Minuten Umleitung mit einem kranken Kind im Auto. Danke für nichts.", argdown_type: "concern", depth: 0, created_at: tm(10, 10, 30) },
+      // 8
+      { author_id: uid(2), content: "Warum nicht ein Kompromiss? Autofreie Zone tagsüber 10-20 Uhr, Durchfahrt für Taxis und Lieferverkehr morgens und abends. Barcelona macht das in den Superblocks ähnlich.", argdown_type: "alternative", depth: 0, created_at: tm(10, 11, 15) },
+      // 9 - reply to 8
+      { author_id: uid(9), content: "Barcelona-Modell klingt gut, aber die Superblocks dort haben Spielplätze, Bäume, echte Aufenthaltsflächen. Einfach nur zeitweise sperren bringt die Aufenthaltsqualität nicht.", argdown_type: "objection", parentIndex: 8, depth: 1, created_at: tm(10, 11, 33) },
+      // 10
+      { author_id: uid(8), content: "Für mich als Radfahrer ist es angenehm. Aber ich sehe auch, dass die Geschäfte leiden. Vielleicht mehr Sitzbänke und Bäume, damit Leute dort gerne verweilen? Ein Radweg allein macht keine Flaniermeile.", argdown_type: "proposal", depth: 0, created_at: tm(10, 12, 5) },
+      // 11
+      { author_id: uid(4), content: "Ist mir ehrlich gesagt egal ob die Friedrichstraße autofrei ist. Ich war da dreimal im Leben. Wann kriegen wir in Marzahn endlich ordentliche Radwege? Immer nur Prestigeprojekte in Mitte.", argdown_type: "question", depth: 0, created_at: tm(10, 13, 20) },
+    ]);
+  }
+
+  // ── T2: Müll Neukölln ──
+  if (topicIds[1]) {
+    buildTopicPosts(topicIds[1], [
+      // 0
+      { author_id: uid(2), content: "Ich arbeite seit 12 Jahren in Neukölln mit Familien. Das Müllproblem hat viele Ursachen. Erstens: 15.000 Einwohner/km², dreimal Berliner Durchschnitt. Zweitens: Die Hausverwaltungen bestellen absichtlich zu kleine Tonnen, um Kosten zu sparen. Mittwoch ist die Tonne voll, nächste Leerung Montag. Wo soll der Müll hin?", argdown_type: "evidence", depth: 0, created_at: tm(11, 8, 0) },
+      // 1 - reply to 0
+      { author_id: uid(3), content: "BSR-Daten bestätigen das: Neukölln hat pro Kopf weniger Leerungen als Charlottenburg, obwohl doppelte Bevölkerungsdichte. Das ist strukturelles Versagen bei der Ressourcenverteilung.", argdown_type: "evidence", parentIndex: 0, depth: 1, created_at: tm(11, 8, 30) },
+      // 2
+      { author_id: uid(1), content: "Ich sage es ungern, aber ein Teil des Problems ist mangelnde Erziehung. In Steglitz funktioniert die Mülltrennung, weil die Leute es von klein auf gelernt haben. Man kann nicht erwarten, dass das ohne Anpassung funktioniert, wenn ständig neue Bewohner dazukommen, die andere Gewohnheiten haben.", argdown_type: "claim", depth: 0, created_at: tm(11, 9, 0) },
+      // 3 - reply to 2
+      { author_id: uid(2), content: "Jürgen, das klingt nach einer einfachen Erklärung, stimmt aber nicht. Deutsche, Türken, Araber stehen vor den gleichen überquellenden Tonnen. Das Problem ist die Infrastruktur, nicht die Herkunft der Bewohner.", argdown_type: "rebuttal", parentIndex: 2, depth: 1, created_at: tm(11, 9, 20) },
+      // 4 - reply to 3
+      { author_id: uid(5), content: "TU-Studien zur urbanen Abfallwirtschaft zeigen: Müllprobleme in dicht besiedelten Vierteln treten unabhängig von ethnischer Zusammensetzung auf. Moabit und Teile von Wedding haben ähnliche Probleme – und dort wohnen mehrheitlich Deutsche.", argdown_type: "evidence", parentIndex: 3, depth: 2, created_at: tm(11, 9, 45) },
+      // 5
+      { author_id: uid(4), content: "Wohne in Marzahn. Kein Müllproblem. Warum? Platten haben Platz für große Container, die BSR kommt regelmäßig, ordentliche Müllräume. Neukölln hat winzige Gründerzeit-Hinterhöfe. Das ist baulich ein komplett anderes Problem.", argdown_type: "alternative", depth: 0, created_at: tm(11, 10, 0) },
+      // 6
+      { author_id: uid(6), content: "Hausverwaltungen sind das Hauptproblem. Bestellen absichtlich zu wenig Mülltonnen, kein Hausmeister, kein Sperrmüllservice. Ordnungsamt muss härter durchgreifen. Bußgelder, die wirklich wehtun.", argdown_type: "proposal", depth: 0, created_at: tm(11, 10, 30) },
+      // 7 - reply to 6
+      { author_id: uid(3), content: "Bezirksamt Neukölln hat genau 3 Mitarbeiter für Ordnungswidrigkeiten im Bereich Abfall. Drei. Für 330.000 Einwohner. Bußgelder beschließen kann man – durchsetzen ist eine andere Frage.", argdown_type: "concern", parentIndex: 6, depth: 1, created_at: tm(11, 10, 50) },
+      // 8
+      { author_id: uid(7), content: "Neben dem Schulhof meiner Kinder: illegale Müllkippe seit Monaten. Matratzen, Kühlschränke, Farbreste. BSR hat es dreimal abgeholt, dreimal kam es wieder. Meine Tochter fragt mich: Warum macht da keiner was? Ich hab keine Antwort.", argdown_type: "concern", depth: 0, created_at: tm(11, 11, 0) },
+      // 9
+      { author_id: uid(9), content: "Müllproblem = Gerechtigkeitsproblem. In Zehlendorf würde eine illegale Kippe keine 24 Stunden stehen. In Neukölln seit Monaten. Die Stadt investiert nicht gleich – und das ist politisch gewollt.", argdown_type: "claim", depth: 0, created_at: tm(11, 11, 30) },
+      // 10
+      { author_id: uid(8), content: "In meinem Haus in Wedding: Nachbarschaft hat mehrsprachige Müllregeln aufgestellt und einen Müllbeauftragten gewählt. Seitdem deutlich besser. Manchmal hilft es, wenn Nachbarn miteinander reden, statt auf die Verwaltung zu warten.", argdown_type: "alternative", depth: 0, created_at: tm(11, 12, 0) },
+      // 11
+      { author_id: uid(10), content: "Unterirdische Container wie in Barcelona oder Amsterdam. Sieht besser aus, fasst mehr, kein Ratten- oder Vandalismusproblem. Wir bauen U-Bahnen für Milliarden und kriegen den Müll nicht geregelt?", argdown_type: "proposal", depth: 0, created_at: tm(11, 12, 30) },
+      // 12
+      { author_id: uid(5), content: "Kiezbotschafter-Modell ist am vielversprechendsten. Wien hat 'Waste Watchers': niedrigschwellige Beratung plus Ordnungswidrigkeiten melden. 30% weniger Fehlwürfe in Pilotgebieten.", argdown_type: "support", depth: 0, created_at: tm(11, 13, 0) },
+      // 13
+      { author_id: uid(1), content: "Ich habe nichts gegen Migration gesagt. Ich habe gesagt, dass neue Bewohner andere Gewohnheiten haben können. Das gilt für Studenten aus Schwaben genauso. Aber offenbar darf man das nicht ansprechen, ohne in eine Ecke gestellt zu werden.", argdown_type: "rebuttal", depth: 0, created_at: tm(11, 13, 30) },
+      // 14 - reply to 13
+      { author_id: uid(2), content: "Jürgen, das Problem ist nicht was Sie sagen, sondern was Sie implizieren. 'Erziehung' und 'andere Gewohnheiten' sind Codes, die jeder versteht. Wenn Sie strukturelle Probleme meinen, sagen Sie das auch so.", argdown_type: "objection", parentIndex: 13, depth: 1, created_at: tm(11, 13, 50) },
+    ]);
+  }
+
+  // ── T3: Schulfinanzierung ──
+  if (topicIds[2]) {
+    buildTopicPosts(topicIds[2], [
+      // 0
+      { author_id: uid(2), content: "Ich unterrichte an einer Schule in Wedding mit 92% Kindern aus Familien mit Transferleistungsbezug. Wir haben die gleiche Ausstattung wie eine Schule in Zehlendorf mit 5%. Gleiche Lehrerzahl, gleiche Mittel, gleiche Erwartungen. Aber komplett andere Herausforderungen. Das ist keine Chancengleichheit – das ist organisierte Ungleichheit.", argdown_type: "claim", depth: 0, created_at: tm(12, 8, 0) },
+      // 1
+      { author_id: uid(5), content: "Der Sozialindex ist grundsätzlich richtig, aber die Umsetzung muss stimmen. Hamburg macht das seit 2013 – mit gemischten Ergebnissen. Die zusätzlichen Mittel versickern oft in Verwaltung statt im Klassenzimmer. Wenn Berlin das macht, braucht es klare Wirkungsmessung.", argdown_type: "concern", depth: 0, created_at: tm(12, 8, 30) },
+      // 2
+      { author_id: uid(1), content: "Ich bin skeptisch. Meine Enkel gehen in Steglitz zur Schule, die Klassen sind auch voll, die Lehrer auch überarbeitet. Wenn jetzt Geld umverteilt wird, heißt das weniger für uns? Das kann doch nicht die Lösung sein.", argdown_type: "objection", depth: 0, created_at: tm(12, 9, 0) },
+      // 3
+      { author_id: uid(3), content: "Daten aus Hamburg (KESS-Studie 2023): Schulen mit Sozialindex 1-2 haben nach Einführung der indexbasierten Finanzierung ihre Leistungswerte in Mathematik um durchschnittlich 8% verbessert. Schulen mit Index 5-6 blieben stabil. Kein messbarer Nachteil für bessergestellte Schulen.", argdown_type: "evidence", depth: 0, created_at: tm(12, 9, 30) },
+      // 4
+      { author_id: uid(2), content: "Was in der Debatte immer fehlt: Es geht nicht nur um Geld. Die Schulen in Neukölln und Wedding haben massive Personalfluktuation, weil niemand dort arbeiten will. Bevor wir über Geld reden, müssen wir über Arbeitsbedingungen reden.", argdown_type: "alternative", depth: 0, created_at: tm(12, 10, 0) },
+      // 5
+      { author_id: uid(4), content: "Mein Sohn auf der Sekundarschule hat aufgegeben. Sagt er wird eh kein Abi machen. Er ist 12. Was macht dieses System mit unseren Kindern?", argdown_type: "concern", depth: 0, created_at: tm(12, 10, 30) },
+      // 6
+      { author_id: uid(1), content: "Also soll die Tatsache, dass in einer Schule viele Kinder kein Deutsch sprechen, dazu führen, dass die Schule mehr Geld bekommt? Warum belohnt man schlechte Integration?", argdown_type: "objection", depth: 0, created_at: tm(12, 11, 0) },
+      // 7 - reply to 6
+      { author_id: uid(2), content: "Herr Helbig, das ist ein grundlegendes Missverständnis. Es geht nicht um Belohnung, sondern um Bedarfsgerechtigkeit. Ein Kind, das kein Deutsch spricht, braucht mehr Förderung. Das ist keine Bevorzugung – das ist der Versuch, gleiche Startbedingungen zu schaffen.", argdown_type: "rebuttal", parentIndex: 6, depth: 1, created_at: tm(12, 11, 15) },
+      // 8
+      { author_id: uid(5), content: "Vorschlag zur Synthese: 1) Grundfinanzierung pro Schüler bleibt gleich. 2) Zusätzliche Bedarfsmittel (Sprachförderung, Sozialarbeit, Schulpsychologie) werden nach Sozialindex verteilt. So fühlt sich niemand benachteiligt.", argdown_type: "proposal", depth: 0, created_at: tm(12, 11, 30) },
+      // 9 - reply to 8
+      { author_id: uid(7), content: "Genau das. Und bitte auch Schulsozialarbeit einbeziehen. An unserer Partnerschule in Wedding gibt es eine Sozialarbeiterin für 600 Kinder. In Zehlendorf sind es zwei für 400.", argdown_type: "support", parentIndex: 8, depth: 1, created_at: tm(12, 11, 45) },
+      // 10 - reply to 8
+      { author_id: uid(1), content: "Na gut, wenn die Grundfinanzierung gleich bleibt, kann ich damit leben. Aber ich will sehen, dass das kontrolliert wird und nicht einfach in irgendwelchen Verwaltungstöpfen verschwindet.", argdown_type: "support", parentIndex: 8, depth: 1, created_at: tm(12, 12, 0) },
+    ]);
+  }
+
+  // ── Posts for existing topics ──
+  const existingTopicIds = {
+    rent: "e683e4cd-3722-4fc8-9f1a-1688802a2795",
+    car: "188961de-9ede-41bd-80a0-b71788f6f374",
+    dt: "cae26269-f96c-44c0-933c-4dbb0f1abe28",
+    school: "4e7209da-b4f1-4f0e-a8e3-6db9cff19cbb",
+  };
+
+  // Rent cap
+  buildTopicPosts(existingTopicIds.rent, [
+    { author_id: uid(4), content: "Meine Miete ist in drei Jahren um 200€ gestiegen. Ich verdiene als Lagerist keine 2500 netto. Der Mietendeckel war das Einzige, was kurz geholfen hat.", argdown_type: "support", depth: 0, created_at: tm(13, 9, 0) },
+    { author_id: uid(6), content: "Jeder Mietendeckel vernichtet Investitionsanreize. Weniger Neubau = weniger Angebot = noch höhere Mieten danach. Das ist das grundsätzliche Problem mit Preiskontrollen.", argdown_type: "objection", depth: 0, created_at: tm(13, 10, 0) },
+    { author_id: uid(5), content: "Die Daten sind gemischt. DIW-Studie: Baugenehmigungen sanken während des Deckels, aber der bundesweite Trend war ähnlich. Kausalität schwer nachzuweisen.", argdown_type: "evidence", parentIndex: 1, depth: 1, created_at: tm(13, 10, 30) },
+    { author_id: uid(1), content: "Ich bin Eigentümer einer kleinen Wohnung in Steglitz. Meine Mieterin zahlt unter Marktpreis – freiwillig. Aber wenn der Staat mir vorschreibt was ich nehmen darf, kann ich die Instandhaltung nicht bezahlen. Das Dach allein kostet 80.000€.", argdown_type: "concern", depth: 0, created_at: tm(13, 11, 0) },
+    { author_id: uid(9), content: "Wohnen ist ein Grundrecht! Vonovia und Deutsche Wohnen machen Milliardenprofite, während Menschen verdrängt werden. Ein Mietendeckel ist das Minimum. Eigentlich müssten wir enteignen.", argdown_type: "claim", depth: 0, created_at: tm(13, 11, 30) },
+    { author_id: uid(1), content: "\"Enteignen\" – und dann verwaltet der Berliner Senat die Wohnungen? Der gleiche Senat, der den BER verbockt hat. Na dann gute Nacht.", argdown_type: "rebuttal", parentIndex: 4, depth: 1, created_at: tm(13, 12, 0) },
+    { author_id: uid(3), content: "Wien zeigt: Öffentlicher Wohnungsbau funktioniert. 60% der Wiener leben in geförderten Wohnungen. Berlin baut zu wenig und zu spät.", argdown_type: "evidence", depth: 0, created_at: tm(13, 12, 30) },
+    { author_id: uid(8), content: "Das Problem ist nicht nur der Preis. Mit meinem arabischen Namen werde ich oft nicht einmal zur Besichtigung eingeladen. Diskriminierung am Wohnungsmarkt wird kaum thematisiert.", argdown_type: "concern", depth: 0, created_at: tm(13, 13, 0) },
+    { author_id: uid(2), content: "Amirs Punkt wird in der Debatte zu oft übersehen. Anti-Diskriminierungsgesetze beim Wohnen werden kaum durchgesetzt. Eine unabhängige Miet-Ombudsstelle könnte helfen.", argdown_type: "proposal", depth: 0, created_at: tm(13, 13, 30) },
+  ]);
+
+  // Car-free
+  buildTopicPosts(existingTopicIds.car, [
+    { author_id: uid(10), content: "Autofreie Innenstadt – wie kommen Handwerker zu ihren Kunden? Wie liefert der Bäcker seine Brötchen? Ich fahre 200km am Tag, nicht aus Spaß.", argdown_type: "concern", depth: 0, created_at: tm(14, 8, 30) },
+    { author_id: uid(9), content: "Oslo zeigt: Autofrei heißt nicht komplett autofrei. Lieferverkehr, Taxis, Behindertentransport sind erlaubt. Es geht nur um privaten Durchgangsverkehr.", argdown_type: "rebuttal", depth: 0, created_at: tm(14, 9, 15) },
+    { author_id: uid(7), content: "Dafür, wenn gleichzeitig der ÖPNV massiv ausgebaut wird. Kein Bus im 20-Minuten-Takt und kein Nachtbus der um 1 Uhr aufhört.", argdown_type: "support", depth: 0, created_at: tm(14, 10, 30) },
+    { author_id: uid(1), content: "Immer diese Skandinavien-Vergleiche. Oslo hat 700.000 Einwohner und einen Ölfonds. Berlin hat 3,7 Millionen und kein Geld. Komplett andere Voraussetzungen.", argdown_type: "objection", depth: 0, created_at: tm(14, 11, 30) },
+    { author_id: uid(3), content: "Umfrage SenMVKU 2025: 62% der Berliner befürworten autofreie Zonen in der Innenstadt, aber nur 34% wollen das eigene Auto aufgeben. Das Paradox der Verkehrswende.", argdown_type: "evidence", depth: 0, created_at: tm(14, 12, 0) },
+    { author_id: uid(4), content: "Leute in Marzahn brauchen das Auto zum Einkaufen. Nächster Supermarkt 1,5 km, Bus alle 20 Minuten. Macht mal autofreie Zone in Grunewald, da wohnen die mit Alternativen.", argdown_type: "objection", depth: 0, created_at: tm(14, 12, 30) },
+  ]);
+
+  // Deutschlandticket
+  buildTopicPosts(existingTopicIds.dt, [
+    { author_id: uid(4), content: "49€ sind schon viel für mich. 69€? Dann kann ich gleich Auto fahren. Das Ticket muss billig bleiben, sonst nutzt es den Leuten nix, die es am meisten brauchen.", argdown_type: "concern", depth: 0, created_at: tm(14, 9, 0) },
+    { author_id: uid(3), content: "Vorschlag: Sozialstaffelung. 29€ für Geringverdiener, 49€ Standard, 69€ Premium mit IC/RE-Zuschlag. Gerechter als ein Einheitspreis für alle.", argdown_type: "proposal", depth: 0, created_at: tm(14, 10, 0) },
+    { author_id: uid(10), content: "Das Ticket hat mein Leben verändert. Spare 80€ im Monat. Aber die Züge sind voller, die Qualität sinkt. Kapazitätsausbau muss mithalten.", argdown_type: "support", depth: 0, created_at: tm(14, 11, 0) },
+    { author_id: uid(6), content: "Warum Milliarden in ÖPNV-Subventionen, aber nichts für Straßen? Die Autobahnen zerfallen, Brücken werden gesperrt. Reine Symbolpolitik.", argdown_type: "objection", depth: 0, created_at: tm(14, 12, 0) },
+    { author_id: uid(5), content: "Studie Agora Verkehrswende: Deutschlandticket hat 2024 ca. 1,5 Mio. Tonnen CO2 eingespart. Kostet den Staat 3 Mrd./Jahr. Das ist einer der effizientesten Klimaschutzmaßnahmen überhaupt.", argdown_type: "evidence", depth: 0, created_at: tm(14, 12, 30) },
+    { author_id: uid(1), content: "Klimaschutz hin oder her – wenn der RE1 jeden zweiten Tag ausfällt, fahre ich halt wieder Auto. Zuverlässigkeit vor Preis.", argdown_type: "concern", depth: 0, created_at: tm(14, 13, 0) },
+  ]);
+
+  // School reform
+  buildTopicPosts(existingTopicIds.school, [
+    { author_id: uid(7), content: "Als Grundschullehrerin: Die frühe Selektion mit 10 macht Kinder kaputt. Spätentwickler haben keine Chance. Und Eltern aus bildungsfernen Familien wissen oft nicht, wie sie ihre Kinder fürs Gymnasium anmelden.", argdown_type: "support", depth: 0, created_at: tm(15, 8, 45) },
+    { author_id: uid(1), content: "Das Gymnasium hat sich bewährt. Meine Enkel werden dort gefördert und gefordert. Einheitsschule senkt das Niveau für alle. PISA-Ergebnisse der Gesamtschulen sprechen für sich.", argdown_type: "objection", depth: 0, created_at: tm(15, 9, 30) },
+    { author_id: uid(5), content: "Die niedrigeren PISA-Ergebnisse der Gesamtschulen kommen vom Selektionseffekt, nicht von der Qualität. Finnland hat NUR Gesamtschulen und schneidet international besser ab als Deutschland.", argdown_type: "rebuttal", parentIndex: 1, depth: 1, created_at: tm(15, 9, 55) },
+    { author_id: uid(8), content: "Bin mit 15 nach Deutschland gekommen, kein Wort Deutsch. Wurde der Hauptschule zugewiesen. Heute bin ich Fachinformatiker – trotz des Systems, nicht wegen ihm. Wie viele schaffen es nicht?", argdown_type: "evidence", depth: 0, created_at: tm(15, 10, 30) },
+    { author_id: uid(4), content: "Mein Sohn auf der Sekundarschule hat aufgegeben. Sagt er wird eh kein Abi machen. Er ist 12. Was macht dieses System mit einem Kind, das sich schon als Verlierer sieht?", argdown_type: "concern", depth: 0, created_at: tm(15, 11, 15) },
+    { author_id: uid(3), content: "PISA 2022 für Deutschland: Der Zusammenhang zwischen sozioökonomischem Hintergrund und Schulleistung ist stärker als im OECD-Durchschnitt. Das dreigliedrige System verstärkt diese Korrelation nachweislich.", argdown_type: "evidence", depth: 0, created_at: tm(15, 11, 45) },
+    { author_id: uid(6), content: "Mehr Geld allein hilft nicht. Berliner Schulen haben eines der höchsten Pro-Kopf-Budgets bundesweit. Das Problem ist die Verwaltung, nicht das Geld.", argdown_type: "objection", depth: 0, created_at: tm(15, 12, 15) },
+  ]);
+
+  // ── Step 4: Insert posts with parent references resolved ──
+  const insertedIds: string[] = [];
+  for (let i = 0; i < allPosts.length; i++) {
+    const p = { ...allPosts[i] };
+    // Resolve parent references
+    if (p.parent_post_id && p.parent_post_id.startsWith("__ref:")) {
+      const refIdx = parseInt(p.parent_post_id.replace("__ref:", ""));
+      p.parent_post_id = insertedIds[refIdx] || null;
+    }
+    const { data, error } = await supabase.from("posts").insert(p).select("id").single();
+    if (error) {
+      console.error(`Post ${i} error:`, error.message);
+      insertedIds.push("");
+      continue;
+    }
+    insertedIds.push(data.id);
+  }
+
+  // ── Step 5: Votes ──
+  // Define vote patterns per post index: [upvoters, downvoters] (1-indexed user numbers)
+  const votePatterns: Record<number, [number[], number[]]> = {
+    // T1: Friedrichstraße
+    0: [[1, 4, 6], [9]],
+    1: [[5, 9, 2], [10]],
+    2: [[1, 4, 6], [3]],
+    3: [[2, 3, 5, 8], [6, 10]],
+    4: [[1, 4, 10], []],
+    5: [[3, 9, 2, 8], [6, 1]],
+    6: [[4, 6, 7, 10], [9]],
+    7: [[1, 4, 10], []],
+    8: [[3, 7, 8, 1, 10], [9]],
+    9: [[5], [6]],
+    10: [[2, 3, 7], []],
+    11: [[2, 8], []],
+    // T2: Müll Neukölln
+    12: [[5, 3, 7, 4, 8], []],
+    13: [[5, 2, 9, 4], []],
+    14: [[10, 6], [2, 9, 5, 8]],
+    15: [[5, 9, 8, 3, 4], [1, 6]],
+    16: [[3, 2, 8, 9], []],
+    17: [[2, 3, 7], []],
+    18: [[1, 4, 7, 10, 2], []],
+    19: [[2, 5, 4, 9], []],
+    20: [[1, 4, 10, 2, 8], []],
+    21: [[2, 4, 8, 5], [1]],
+    22: [[3, 7, 1], [9]],
+    23: [[3, 7, 2, 6, 4], []],
+    24: [[3, 2, 7, 8], []],
+    25: [[6, 10], [2, 9]],
+    26: [[5, 9, 8], [1]],
+    // T3: Schulfinanzierung
+    27: [[5, 3, 8, 9, 4], [1]],
+    28: [[3, 7], []],
+    29: [[6, 10], [2, 5, 9]],
+    30: [[2, 5, 7, 9], []],
+    31: [[3, 8, 4], []],
+    32: [[2, 7, 8, 9], []],
+    33: [[10, 6], [2, 9, 5]],
+    34: [[5, 9, 8, 3], [1]],
+    35: [[3, 2, 7, 8, 5, 9, 4], []],
+    36: [[2, 8, 4], []],
+    37: [[1, 6, 7], []],
+    // Rent
+    38: [[2, 8, 9], [6]],
+    39: [[1, 10], [4, 9]],
+    40: [[3, 7, 2, 8], []],
+    41: [[6, 10], [9]],
+    42: [[4, 2, 8], [1, 6, 10]],
+    43: [[6, 10, 7], [9, 2]],
+    44: [[5, 2, 9, 4], [6]],
+    45: [[2, 5, 4, 9], []],
+    46: [[5, 8, 3, 7], []],
+    // Car-free
+    47: [[1, 4, 6], [9]],
+    48: [[3, 5, 2], [10]],
+    49: [[1, 4, 8, 2, 10], []],
+    50: [[6, 10], [5, 9]],
+    51: [[3, 5, 7, 9], []],
+    52: [[2, 8, 4], []],
+    // DT
+    53: [[2, 8, 7], [6]],
+    54: [[5, 2, 7, 8, 4], []],
+    55: [[1, 4, 7], []],
+    56: [[1, 10], [9, 2, 5]],
+    57: [[3, 9, 2, 5], []],
+    58: [[4, 6, 10, 7], []],
+    // School
+    59: [[2, 5, 8, 9], [1]],
+    60: [[6, 10], [2, 5, 9]],
+    61: [[3, 2, 7, 9], [1]],
+    62: [[2, 5, 7, 9, 4], []],
+    63: [[2, 7, 8, 9], []],
+    64: [[3, 5, 2], []],
+    65: [[1, 6, 10], [9]],
+  };
+
   const allVotes: { post_id: string; user_id: string; value: number }[] = [];
-  const av = (pid: string, ups: number[], downs: number[]) => { for (const u of ups) allVotes.push({ post_id: pid, user_id: uid(u), value: 1 }); for (const d of downs) allVotes.push({ post_id: pid, user_id: uid(d), value: -1 }); };
-  const tm = (h: number, m: number) => `2026-03-10T${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:00+00:00`;
-
-  // T1: Friedrichstraße
-  const t1 = topics[0].id;
-  let p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(10), content: "Ich fahre seit 25 Jahren Taxi durch Berlin. Die Friedrichstraße war vorher schon kein Vergnügen, aber jetzt ist das Chaos perfekt. Die Ausweichrouten sind komplett überlastet. Meine Fahrgäste zahlen mehr, weil ich Umwege fahren muss.", argdown_type: "concern", created_at: tm(8,12) }); av(p,[1,4,6],[9]);
-  let p2 = pid(); allPosts.push({ id: p2, topic_id: t1, author_id: uid(3), content: "Die Verkehrsdaten vom Senat zeigen, dass der Durchgangsverkehr insgesamt um 12% zurückgegangen ist. Ein Teil der Autofahrten findet einfach nicht mehr statt.", argdown_type: "evidence", parent_post_id: p, depth: 1, created_at: tm(8,34) }); av(p2,[5,9,2],[10]);
-  let p3 = pid(); allPosts.push({ id: p3, topic_id: t1, author_id: uid(10), content: "12% weniger Verkehr insgesamt klingt super, bis man in der Charlottenstraße im Stau steht und der Taxameter läuft. Statistik und Realität sind zwei Paar Schuhe.", argdown_type: "rebuttal", parent_post_id: p2, depth: 2, created_at: tm(8,51) }); av(p3,[1,4,6],[3]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(9), content: "Endlich kann man dort sicher Rad fahren! Vorher war die Friedrichstraße eine der gefährlichsten Straßen in Mitte. Drei Unfälle mit Schwerverletzten 2023. Seit der Sperrung: null.", argdown_type: "support", created_at: tm(9,5) }); av(p,[2,3,5,8],[6,10]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(6), content: "Mein Kollege hatte ein Restaurant an der Friedrichstraße. Musste schließen. 30% Umsatzrückgang. Die Leute kommen einfach nicht mehr.", argdown_type: "objection", created_at: tm(9,22) }); av(p,[1,4,10],[]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t1, author_id: uid(5), content: "Die Umsatzrückgänge sind real, aber multifaktoriell – Online-Handel, Inflation, Tourismus-Rückgang. Vergleichbare Straßen ohne Sperrung hatten ähnliche Verluste.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(9,48) }); av(p2,[3,9,2,8],[6,1]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(1), content: "Die Umsetzung ist schlecht. Kein Konzept für Anwohner, keine Tiefgarage, keine gute ÖPNV-Anbindung. Man kann nicht einfach Straßen sperren und hoffen.", argdown_type: "concern", created_at: tm(10,3) }); av(p,[4,6,7,10],[9]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(7), content: "Als Mutter: Ich muss meine Tochter manchmal zur Charité bringen. Vorher direkt über die Friedrichstraße. Jetzt 20 Minuten Umleitung mit krankem Kind.", argdown_type: "concern", created_at: tm(10,30) }); av(p,[1,4,10],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(2), content: "Warum nicht Kompromiss? Autofreie Zone tagsüber, Durchfahrt für Taxis und Lieferverkehr morgens und abends. Barcelona macht das.", argdown_type: "alternative", created_at: tm(11,15) }); av(p,[3,7,8,1,10],[9]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t1, author_id: uid(9), content: "Barcelona-Modell klingt gut, aber die Superblocks dort haben Spielplätze, Bäume, Aufenthaltsflächen. Einfach zeitweise sperren bringt die Qualität nicht.", argdown_type: "objection", parent_post_id: p, depth: 1, created_at: tm(11,33) }); av(p2,[5],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(8), content: "Für mich als Radfahrer ist es angenehm. Aber ich sehe auch, dass Geschäfte leiden. Mehr Sitzbänke und Bäume, damit Leute verweilen wollen?", argdown_type: "proposal", created_at: tm(12,5) }); av(p,[2,3,7],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t1, author_id: uid(4), content: "Ist mir egal ob die Friedrichstraße autofrei ist. Ich war da dreimal im Leben. Wann kriegen wir in Marzahn ordentliche Radwege?", argdown_type: "question", created_at: tm(13,20) }); av(p,[2,8],[]);
-
-  // T2: Mietendeckel
-  const t2 = topics[1].id;
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(4), content: "Meine Miete ist in drei Jahren um 200€ gestiegen. Ich verdiene als Lagerist keine 2500 netto. Der Mietendeckel war das Einzige, was kurz geholfen hat.", argdown_type: "support", created_at: tm(8,0) }); av(p,[2,7,8,9],[6]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t2, author_id: uid(6), content: "Der Mietendeckel hat Investoren vertrieben. Weniger Neubau = weniger Angebot = noch höhere Mieten danach. Das Problem mit Preiskontrollen.", argdown_type: "objection", parent_post_id: p, depth: 1, created_at: tm(8,25) }); av(p2,[1,10],[4,9]);
-  p3 = pid(); allPosts.push({ id: p3, topic_id: t2, author_id: uid(5), content: "Die Daten sind gemischt. DIW: Baugenehmigungen sanken, aber bundesweiter Trend war ähnlich. Kausalität schwer nachzuweisen.", argdown_type: "evidence", parent_post_id: p2, depth: 2, created_at: tm(8,52) }); av(p3,[3,7,2,8],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(1), content: "Ich bin Eigentümer einer kleinen Wohnung in Steglitz. Meine Mieterin zahlt unter Marktpreis. Aber wenn der Staat vorschreibt was ich nehmen darf, kann ich die Instandhaltung nicht bezahlen. Das Dach kostet 80.000€.", argdown_type: "concern", created_at: tm(9,15) }); av(p,[6,10],[9]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(9), content: "Wohnen ist ein Grundrecht! Vonovia und Deutsche Wohnen machen Milliardenprofite, während Menschen verdrängt werden. Ein Mietendeckel ist das Minimum. Eigentlich müssten wir enteignen.", argdown_type: "claim", created_at: tm(9,40) }); av(p,[4,2,8],[1,6,10]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t2, author_id: uid(1), content: "\"Enteignen\" – und dann verwaltet der Berliner Senat die Wohnungen. Der gleiche Senat, der den BER verbockt hat. Na dann gute Nacht.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(10,0) }); av(p2,[6,10,7],[9,2]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(3), content: "Wien zeigt: Öffentlicher Wohnungsbau funktioniert. 60% leben in geförderten Wohnungen. Berlin baut zu wenig und zu spät.", argdown_type: "evidence", created_at: tm(10,30) }); av(p,[5,2,9,4],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(7), content: "Können wir aufhören, Wien und Berlin zu vergleichen? Wien baut seit den 1920ern systematisch. Was wir JETZT brauchen, sind pragmatische Lösungen.", argdown_type: "objection", created_at: tm(11,10) }); av(p,[1,10],[5]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(8), content: "Das Problem ist nicht nur der Preis, sondern die Diskriminierung. Mit meinem arabischen Namen werde ich oft nicht zur Besichtigung eingeladen.", argdown_type: "concern", created_at: tm(11,45) }); av(p,[2,5,4,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(2), content: "Amirs Punkt wird in der Debatte oft übersehen. Anti-Diskriminierungsgesetze beim Wohnen werden kaum durchgesetzt. Eine Miet-Ombudsstelle könnte helfen.", argdown_type: "proposal", created_at: tm(12,5) }); av(p,[5,8,3,7],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t2, author_id: uid(10), content: "Ich höre jeden Tag Miet-Geschichten im Taxi. Rentnerin aus Schöneberg: 1.200€ warm für 55qm. Rente: 1.400. Irgendwas muss passieren.", argdown_type: "question", created_at: tm(13,0) }); av(p,[4,7,2],[]);
-
-  // T3: Görlitzer Park
-  const t3 = topics[2].id;
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(1), content: "Der Zaun war richtig. Punkt. Seit der Zaun steht ist es deutlich ruhiger. Meine Bekannte an der Görlitzer Straße schläft wieder durch.", argdown_type: "claim", created_at: tm(8,20) }); av(p,[10,7],[2,9,5]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t3, author_id: uid(2), content: "Der Zaun hat das Problem nur verschoben. Der Drogenhandel ist jetzt im Wrangelkiez, am Kotti, im Görlitzer Bahnhof. Für die Anwohner dort ist es schlimmer.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(8,45) }); av(p2,[5,9,8],[1]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(9), content: "Der Görli war immer ein Ort der Freiheit, der Subkultur. Jetzt kommt ein Zaun drum. Das ist Disneyfizierung. Als nächstes: Eintritt für den Mauerpark?", argdown_type: "objection", created_at: tm(9,0) }); av(p,[6],[1,7,10]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(7), content: "Sorry, als Mutter: Subkultur ist schön, aber meine 7-Jährige sollte nicht an Spritzen vorbeilaufen. Das hat nichts mit Disneyfizierung zu tun.", argdown_type: "objection", created_at: tm(9,30) }); av(p,[1,10,4],[9]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t3, author_id: uid(2), content: "Genau dafür gibt es Konsumräume. Weniger Spritzen im Park. Pragmatische Gesundheitspolitik. Frankfurt hat damit gute Erfahrungen.", argdown_type: "alternative", parent_post_id: p, depth: 1, created_at: tm(9,50) }); av(p2,[5,3,8],[1]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(5), content: "Forschungslage zu Drug Consumption Rooms ist klar: weniger Überdosen, weniger HIV, weniger öffentlicher Konsum. Evidenz aus Frankfurt, Hamburg, Zürich ist robust.", argdown_type: "evidence", created_at: tm(10,20) }); av(p,[3,2,8,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(4), content: "Warum wird sowas nie in Zehlendorf diskutiert? Dort gibt es auch Drogenprobleme. Ist halt ein Kiez wo arme Leute wohnen.", argdown_type: "question", created_at: tm(11,0) }); av(p,[2,8,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(6), content: "Ich habe eine Bar am Görlitzer Bahnhof. Seit dem Zaun kommen mehr Touristen, Umsatz gestiegen. Manchmal muss man einfach handeln.", argdown_type: "support", created_at: tm(11,30) }); av(p,[1,10],[9,5]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(3), content: "Integrierter Ansatz: Streetwork + Konsumraum + Polizei + Parkgestaltung. Der Zaun allein ist symptomatisch. Aber alles fordern und nichts finanzieren – Berliner Spezialität.", argdown_type: "proposal", created_at: tm(12,15) }); av(p,[5,2,7,8],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t3, author_id: uid(10), content: "Das eigentliche Problem: Berlin hat keine Drogenpolitik. Wir reagieren nur. Seit 20 Jahren das gleiche Spiel.", argdown_type: "concern", created_at: tm(13,0) }); av(p,[4,7,1],[]);
-
-  // T4: Integrationskurse
-  const t4 = topics[3].id;
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(8), content: "Ich habe 2016 einen Integrationskurs gemacht. Lehrer gut, Organisation katastrophal. 6 Monate Wartezeit. Kurs in Spandau obwohl ich in Wedding wohnte. 90 Min Fahrt täglich. Mit B1-Zertifikat keinen Job, weil Arbeitgeber C1 wollen.", argdown_type: "evidence", created_at: tm(8,15) }); av(p,[2,5,3,7,4],[]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t4, author_id: uid(5), content: "BAMF-Statistiken: durchschnittliche Wartezeit Berlin 4,5 Monate. Abbruchquote 38%. Keine Einzelfälle, systemisches Versagen.", argdown_type: "evidence", parent_post_id: p, depth: 1, created_at: tm(8,40) }); av(p2,[3,2,8,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(1), content: "Natürlich muss man Deutsch lernen. Aber wir machen es den Leuten unnötig schwer. Weder links noch rechts, einfach schlechte Verwaltung.", argdown_type: "claim", created_at: tm(9,0) }); av(p,[4,6,7,10,2],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(6), content: "Kurse sollten Pflicht bleiben. Wer nicht mitmacht, muss mit Konsequenzen rechnen. Fair gegenüber denen, die sich anstrengen.", argdown_type: "claim", created_at: tm(9,30) }); av(p,[1,10],[2,9]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t4, author_id: uid(2), content: "\"Konsequenzen\" – Leistungskürzungen für alleinerziehende Mütter ohne Kitaplatz? Bevor wir über Pflichten reden, müssen Rahmenbedingungen stimmen.", argdown_type: "objection", parent_post_id: p, depth: 1, created_at: tm(9,50) }); av(p2,[5,8,9,4],[6,1]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(7), content: "Als Lehrerin: Die Eltern wollen Deutsch lernen. Aber Kinder bringen, abholen, arbeiten. Wann soll der Kurs sein? Abends sind sie fertig.", argdown_type: "concern", created_at: tm(10,20) }); av(p,[2,8,5,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(3), content: "Vorschlag: Integrationskurse direkt in Schulen anbieten, parallel zum Unterricht der Kinder. Stärkt Integration auf mehreren Ebenen.", argdown_type: "proposal", created_at: tm(11,0) }); av(p,[2,7,8,5,9,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(10), content: "In meinem Taxi sitzen Leute, die seit 3 Jahren hier sind und kaum Deutsch sprechen. Nicht aus bösem Willen – die wurden vergessen. Dann wundern wir uns über Parallelgesellschaften.", argdown_type: "concern", created_at: tm(11,30) }); av(p,[1,2,4,7],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t4, author_id: uid(9), content: "Absurd, dass Kurse nur auf Deutsch fokussieren. Was ist mit demokratischer Bildung, Gleichberechtigung? Und was mit der Integrationspflicht der Aufnahmegesellschaft?", argdown_type: "question", created_at: tm(12,0) }); av(p,[5,2],[1,6]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t4, author_id: uid(1), content: "Integrationspflicht der Aufnahmegesellschaft – was soll das heißen? Ich erwarte, dass die Regeln gelten, die hier gelten. Grundrichtung ist klar.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(12,20) }); av(p2,[6,10],[9,2]);
-
-  // T5: E-Scooter
-  const t5 = topics[4].id;
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(7), content: "Dreimal in einer Woche über E-Scooter gestolpert. Einmal mit Kinderwagen. Die Anbieter kassieren, die Allgemeinheit räumt auf.", argdown_type: "concern", created_at: tm(8,30) }); av(p,[1,4,10,2],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(6), content: "Sollen wir auch Fahrräder verbieten? Problem ist Verhalten einzelner Nutzer, nicht das Produkt. Regulierung ja, Verbotsfantasien nein.", argdown_type: "objection", created_at: tm(9,0) }); av(p,[10],[7,4,1]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t5, author_id: uid(3), content: "Fahrräder gehören Nutzern. E-Scooter gehören Unternehmen, die öffentlichen Raum als kostenloses Lager nutzen. Privatisierung des Gehwegs.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(9,20) }); av(p2,[7,1,5,9],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(9), content: "Ökologische Bilanz katastrophal. Kurze Lebensdauer, Lithium-Akkus, LKW-Transporte. Ersetzen nicht Auto, sondern Fußwege und ÖPNV. Greenwashing.", argdown_type: "evidence", created_at: tm(9,45) }); av(p,[5,2,7],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(5), content: "UBA-Studie 2025: Nur 8% der Fahrten ersetzen Autofahrt. 40% ersetzen Fußwege, 35% ÖPNV. Spricht gegen 'letzte Meile'-Narrativ.", argdown_type: "evidence", created_at: tm(10,10) }); av(p,[3,9,2],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(8), content: "Ich nutze sie gerne. 1,2 km vom U-Bahnhof zur Arbeit. Bus nur alle 20 Min. In 4 Minuten da. Pauschal verbieten wäre falsch.", argdown_type: "support", created_at: tm(10,40) }); av(p,[6,3],[7]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(10), content: "Feste Abstellzonen gibt es in Paris seit 2023. Funktioniert. Berlin will halt nicht. Zu viel Lobby.", argdown_type: "alternative", created_at: tm(11,15) }); av(p,[1,7,3,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(4), content: "Nachts fahren betrunkene Touristen durch Marzahn und schreien rum. App sollte Alkoholsperre haben. Will kein Anbieter.", argdown_type: "concern", created_at: tm(11,50) }); av(p,[7,10,1],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t5, author_id: uid(1), content: "Vorschlag: Nutzungsgebühr pro Scooter/Monat an den Bezirk. Geld für Gehwegsanierung und Barrierefreiheit. Öffentlichen Raum nutzen = zahlen.", argdown_type: "proposal", created_at: tm(12,30) }); av(p,[7,4,3,10],[6]);
-
-  // T6: Müllproblem Neukölln
-  const t6 = topics[5].id;
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(2), content: "Ich arbeite seit 12 Jahren in Neukölln. Das Müllproblem hat viele Ursachen. Erstens: 15.000 Einwohner/km², dreimal Berliner Durchschnitt. Zweitens: Zu kleine Mülltonnen, weil Hausverwaltungen sparen. Mittwoch voll, nächste Leerung Montag.", argdown_type: "evidence", created_at: tm(8,0) }); av(p,[5,3,7,4,8],[]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t6, author_id: uid(3), content: "BSR-Daten: Neukölln hat pro Kopf weniger Leerungen als Charlottenburg, obwohl doppelte Dichte. Strukturelles Versagen der Ressourcenverteilung.", argdown_type: "evidence", parent_post_id: p, depth: 1, created_at: tm(8,30) }); av(p2,[5,2,9,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(1), content: "Ich sage es ungern, aber es hat auch was mit der Bevölkerung zu tun. Viele kennen deutsche Mülltrennung nicht. In Steglitz trennt jeder brav. Keine Rassismus-Aussage, Beobachtung.", argdown_type: "claim", created_at: tm(9,0) }); av(p,[10,6],[2,9,5,8]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t6, author_id: uid(2), content: "Jürgen, klingt nach einfacher Erklärung, stimmt aber nicht. Deutsche, Türken, Araber stehen vor den gleichen überquellenden Tonnen. Problem ist Infrastruktur, nicht Herkunft.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(9,20) }); av(p2,[5,9,8,3,4],[1,6]);
-  p3 = pid(); allPosts.push({ id: p3, topic_id: t6, author_id: uid(5), content: "TU-Studien zeigen: Müllprobleme in dicht besiedelten Vierteln treten unabhängig von ethnischer Zusammensetzung auf. Moabit und Wedding haben ähnliche Probleme.", argdown_type: "evidence", parent_post_id: p2, depth: 2, created_at: tm(9,45) }); av(p3,[3,2,8,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(4), content: "Wohne in Marzahn. Kein Müllproblem. Warum? Platten haben Platz für große Container, BSR kommt regelmäßig. Neukölln: winzige Hinterhöfe. Baulich anders.", argdown_type: "alternative", created_at: tm(10,0) }); av(p,[2,3,7],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(6), content: "Hausverwaltungen sind das Hauptproblem. Bestellen absichtlich zu wenig Tonnen. Ordnungsamt muss härter durchgreifen. Bußgelder, die wehtun.", argdown_type: "proposal", created_at: tm(10,30) }); av(p,[1,4,7,10,2],[]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: t6, author_id: uid(3), content: "Bezirksamt Neukölln: 3 Mitarbeiter für Ordnungswidrigkeiten Abfall. Drei. Für 330.000 Einwohner. Bußgelder beschließen kann man – durchsetzen nicht.", argdown_type: "concern", parent_post_id: p, depth: 1, created_at: tm(10,50) }); av(p2,[2,5,4,9],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(7), content: "Neben dem Schulhof meiner Kinder: illegale Müllkippe. Matratzen, Kühlschränke. BSR hat es dreimal abgeholt, dreimal kam es wieder. Meine Tochter fragt: Warum macht keiner was?", argdown_type: "concern", created_at: tm(11,0) }); av(p,[1,4,10,2,8],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(9), content: "Müllproblem = Gerechtigkeitsproblem. In Zehlendorf würde eine illegale Kippe keine 24h stehen. In Neukölln seit Monaten. Stadt investiert nicht gleich.", argdown_type: "claim", created_at: tm(11,30) }); av(p,[2,4,8,5],[1]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(8), content: "In meinem Haus in Wedding: Hausgemeinschaft hat mehrsprachige Regeln aufgestellt, Müllbeauftragten gewählt. Seitdem deutlich besser. Nachbarn reden statt auf Verwaltung warten.", argdown_type: "alternative", created_at: tm(12,0) }); av(p,[3,7,1],[9]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(10), content: "Unterirdische Container wie Barcelona/Amsterdam. Sieht besser aus, fasst mehr, kein Ratten-/Vandalismusproblem. Wir bauen U-Bahnen für Milliarden und kriegen den Müll nicht geregelt?", argdown_type: "proposal", created_at: tm(12,30) }); av(p,[3,7,2,6,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: t6, author_id: uid(5), content: "Kiezbotschafter-Idee am vielversprechendsten. Wien hat 'Waste Watchers': niedrigschwellige Beratung + Ordnungswidrigkeiten melden. 30% weniger Fehlwürfe in Pilotgebieten.", argdown_type: "support", created_at: tm(13,0) }); av(p,[3,2,7,8],[]);
-
-  // Posts for existing topics
-  const tRent = "e683e4cd-3722-4fc8-9f1a-1688802a2795";
-  p = pid(); allPosts.push({ id: p, topic_id: tRent, author_id: uid(4), content: "3% pro Jahr klingt fair. In meinem Mietvertrag steht 'ortsübliche Vergleichsmiete', wird jedes Jahr höher gesetzt. So ein Deckel wäre wenigstens klar.", argdown_type: "support", created_at: tm(9,0) }); av(p,[2,8,9],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: tRent, author_id: uid(6), content: "Jeder Mietendeckel vernichtet Investitionsanreize. Dann verrotten die Wohnungen halt. Ist das besser?", argdown_type: "objection", created_at: tm(10,0) }); av(p,[1,10],[4,9]);
-  p = pid(); allPosts.push({ id: p, topic_id: tRent, author_id: uid(3), content: "Welche Art Mietendeckel? Pauschale Begrenzung vs. indexbasiert vs. nur nach Modernisierung. Details machen den Unterschied.", argdown_type: "question", created_at: tm(11,0) }); av(p,[5,7,2],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: tRent, author_id: uid(9), content: "Solange Wohnungen Kapitalanlage sind, löst kein Deckel das Grundproblem. Wohnen muss dem Markt entzogen werden.", argdown_type: "claim", created_at: tm(12,0) }); av(p,[2,4],[1,6,10]);
-
-  const tCar = "188961de-9ede-41bd-80a0-b71788f6f374";
-  p = pid(); allPosts.push({ id: p, topic_id: tCar, author_id: uid(10), content: "Autofreie Innenstadt – wie kommen Handwerker zu Kunden? Wie liefert der Bäcker? Ich fahre 200km täglich. Nicht aus Spaß.", argdown_type: "concern", created_at: tm(8,30) }); av(p,[1,4,6],[9]);
-  p = pid(); allPosts.push({ id: p, topic_id: tCar, author_id: uid(9), content: "Oslo zeigt: Autofrei heißt nicht autofrei. Lieferverkehr, Taxis, Behindertentransport erlaubt. Es geht um Durchgangsverkehr.", argdown_type: "rebuttal", created_at: tm(9,15) }); av(p,[3,5,2],[10]);
-  p = pid(); allPosts.push({ id: p, topic_id: tCar, author_id: uid(7), content: "Dafür, wenn gleichzeitig ÖPNV ausgebaut wird. Kein Bus im 20-Min-Takt, kein Nachtbus der um 1 aufhört.", argdown_type: "support", created_at: tm(10,30) }); av(p,[1,4,8,2,10],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: tCar, author_id: uid(1), content: "Immer Skandinavien-Vergleiche. Oslo: 700k Einwohner, Ölfonds. Berlin: 3,7 Mio, kein Geld. Komplett andere Voraussetzungen.", argdown_type: "objection", created_at: tm(11,30) }); av(p,[6,10],[5,9]);
-
-  const tDT = "cae26269-f96c-44c0-933c-4dbb0f1abe28";
-  p = pid(); allPosts.push({ id: p, topic_id: tDT, author_id: uid(4), content: "49€ sind schon viel. 69€? Kann ich gleich Auto fahren. Ticket muss billig bleiben, sonst nutzt es den Falschen nix.", argdown_type: "concern", created_at: tm(9,0) }); av(p,[2,8,7],[6]);
-  p = pid(); allPosts.push({ id: p, topic_id: tDT, author_id: uid(3), content: "Sozialstaffelung: 29€ Geringverdiener, 49€ Standard, 69€ Premium mit IC. Gerechter als Einheitspreis.", argdown_type: "proposal", created_at: tm(10,0) }); av(p,[5,2,7,8,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: tDT, author_id: uid(10), content: "Das Ticket hat mein Leben verändert. Spare 80€/Monat. Aber Züge voller, Qualität sinkt. Kapazität muss mit.", argdown_type: "support", created_at: tm(11,0) }); av(p,[1,4,7],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: tDT, author_id: uid(6), content: "Warum ÖPNV-Milliarden, aber nichts für Straßen? Autobahnen zerfallen. Brücken gesperrt. Symbolpolitik.", argdown_type: "objection", created_at: tm(12,0) }); av(p,[1,10],[9,2,5]);
-
-  const tSchool = "4e7209da-b4f1-4f0e-a8e3-6db9cff19cbb";
-  p = pid(); allPosts.push({ id: p, topic_id: tSchool, author_id: uid(7), content: "Als Grundschullehrerin: Frühe Selektion macht Kinder kaputt. Mit 10 wird über ihre Zukunft entschieden. Spätentwickler haben keine Chance.", argdown_type: "support", created_at: tm(8,45) }); av(p,[2,5,8,9],[1]);
-  p = pid(); allPosts.push({ id: p, topic_id: tSchool, author_id: uid(1), content: "Gymnasium hat sich bewährt. Meine Enkel werden gefördert. Einheitsschule senkt Niveau. PISA-Ergebnisse Gesamtschulen sprechen für sich.", argdown_type: "objection", created_at: tm(9,30) }); av(p,[6,10],[2,5,9]);
-  p2 = pid(); allPosts.push({ id: p2, topic_id: tSchool, author_id: uid(5), content: "PISA-Ergebnisse Gesamtschulen: niedriger wegen Selektionseffekt, nicht Qualität. Finnland hat nur Gesamtschulen und schneidet besser ab.", argdown_type: "rebuttal", parent_post_id: p, depth: 1, created_at: tm(9,55) }); av(p2,[3,2,7,9],[1]);
-  p = pid(); allPosts.push({ id: p, topic_id: tSchool, author_id: uid(8), content: "Bin mit 15 nach Deutschland gekommen, kein Wort Deutsch. Hauptschule zugewiesen. Heute Fachinformatiker – trotz des Systems. Wie viele schaffen es nicht?", argdown_type: "evidence", created_at: tm(10,30) }); av(p,[2,5,7,9,4],[]);
-  p = pid(); allPosts.push({ id: p, topic_id: tSchool, author_id: uid(4), content: "Mein Sohn auf der Sekundarschule hat aufgegeben. Sagt er wird eh kein Abi machen. Er ist 12. Was macht das mit einem Kind?", argdown_type: "concern", created_at: tm(11,15) }); av(p,[2,7,8,9],[]);
-
-  // Update existing profiles to Berlin context
-  const profileUpdates = [
-    { user_id: "dac2f80e-0754-467e-b520-9de868ec20fc", bio: "Verkehrspolitik-Forscherin und ÖPNV-Aktivistin.", location: "Berlin-Schöneberg" },
-    { user_id: "d65c427d-b604-4b2f-9643-a5178ce2b597", bio: "Tech-Gründer. Freie Märkte, weniger Regulierung.", location: "Berlin-Charlottenburg" },
-    { user_id: "5386fb5b-fbb3-421c-abf9-8a32d9a6ce2f", bio: "Stadtteilorganisatorin. Bezahlbarer Wohnraum und Arbeitnehmerrechte.", location: "Berlin-Kreuzberg" },
-    { user_id: "3ba301b6-928c-43cd-9804-e806adfa0152", bio: "Datenanalyst. Ich folge der Evidenz.", location: "Berlin-Mitte" },
-    { user_id: "9dda5214-a293-42b2-8ac7-52f9558039f3", bio: "Ladeninhaberin. Politik sollte an die kleinen Leute denken.", location: "Berlin-Prenzlauer Berg" },
-    { user_id: "8223afcf-4b8c-4d9d-b518-43d5d96feea9", bio: "Elektriker, 30 Jahre Gewerkschaft.", location: "Berlin-Spandau" },
-    { user_id: "d0f3adb2-a2c1-448f-8b02-a0f209c2a8d9", bio: "Umweltwissenschaftlerin. Klimaschutz duldet keinen Aufschub.", location: "Berlin-Friedrichshain" },
-    { user_id: "c089c940-806e-4b5f-ada6-f7a4c114b9d6", bio: "Steuerberater. Haushaltsdisziplin zählt.", location: "Berlin-Wilmersdorf" },
-    { user_id: "6db0cbcc-909d-47ba-92a6-3070d9979dd6", bio: "Sozialarbeiterin und Gleichstellungsbeauftragte.", location: "Berlin-Wedding" },
-    { user_id: "c8b8f3b3-b3bd-47f2-8e52-a50b48d7a19e", bio: "Stadtplanerin. Gutes Design löst Probleme.", location: "Berlin-Kreuzberg" },
-    { user_id: "987ce6b7-ae1b-4fc6-9466-4351397668ea", bio: "Public-Health-Forscherin. Gesundheitliche Chancengleichheit.", location: "Berlin-Neukölln" },
-  ];
-  for (const pu of profileUpdates) {
-    await supabase.from("profiles").update({ bio: pu.bio, location: pu.location }).eq("user_id", pu.user_id);
+  for (const [idxStr, [ups, downs]] of Object.entries(votePatterns)) {
+    const idx = parseInt(idxStr);
+    const postId = insertedIds[idx];
+    if (!postId) continue;
+    for (const u of ups) allVotes.push({ post_id: postId, user_id: uid(u), value: 1 });
+    for (const d of downs) allVotes.push({ post_id: postId, user_id: uid(d), value: -1 });
   }
 
-  // Insert posts
+  // Insert votes in batches
   const bs = 50;
-  for (let i = 0; i < allPosts.length; i += bs) {
-    const batch = allPosts.slice(i, i + bs);
-    const { error } = await supabase.from("posts").upsert(batch, { onConflict: "id" });
-    if (error) console.error("Posts error:", JSON.stringify(error));
-  }
-
-  // Insert votes
-  const votesWithId = allVotes.map((v, i) => ({ ...v, id: `d4000001-0000-0000-0000-${i.toString(16).padStart(12,"0")}` }));
-  for (let i = 0; i < votesWithId.length; i += bs) {
-    const batch = votesWithId.slice(i, i + bs);
-    const { error } = await supabase.from("votes").upsert(batch, { onConflict: "id" });
-    if (error) console.error("Votes error:", JSON.stringify(error));
+  for (let i = 0; i < allVotes.length; i += bs) {
+    const batch = allVotes.slice(i, i + bs);
+    const { error } = await supabase.from("votes").insert(batch);
+    if (error) console.error("Votes error:", error.message);
   }
 
   // Update scores
-  for (const post of allPosts) {
-    const score = allVotes.filter(v => v.post_id === post.id).reduce((s, v) => s + v.value, 0);
-    await supabase.from("posts").update({ score }).eq("id", post.id);
+  const postScores: Record<string, number> = {};
+  for (const v of allVotes) {
+    postScores[v.post_id] = (postScores[v.post_id] || 0) + v.value;
+  }
+  for (const [pid, score] of Object.entries(postScores)) {
+    if (pid) await supabase.from("posts").update({ score }).eq("id", pid);
   }
 
-  return new Response(JSON.stringify({ success: true, profiles: users.length, topics: topics.length, posts: allPosts.length, votes: allVotes.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const successPosts = insertedIds.filter(id => id !== "").length;
+
+  return new Response(JSON.stringify({
+    success: true,
+    users_created: realUserIds.length,
+    topics_created: topicIds.length,
+    posts_created: successPosts,
+    votes_created: allVotes.length,
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
