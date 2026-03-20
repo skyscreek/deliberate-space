@@ -9,7 +9,7 @@ import { degreeCentrality } from 'graphology-metrics/centrality/degree';
 import { TopicRow } from '@/hooks/useTopics';
 import { TopicRelation } from '@/hooks/useTopicRelations';
 import { cn } from '@/lib/utils';
-import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { Search, X, ExternalLink, Maximize2, Minimize2, MessageSquare, Sparkles, Link2, Plus, ArrowRight, Zap, Loader2, StickyNote, ChevronDown, ChevronUp, Ghost, HelpCircle } from 'lucide-react';
 import { useCreateSuggestedDiscussion } from '@/hooks/useCreateSuggestedDiscussion';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+
 /* ── Canvas — warm charcoal, not pure black ── */
 const CANVAS_BG = 'hsl(222 10% 14%)';
 const PANEL_BG = 'hsla(222, 10%, 17%, 0.94)';
@@ -26,12 +27,25 @@ const TEXT_DIM = 'hsla(220, 10%, 75%, 0.45)';
 const TEXT_MED = 'hsla(220, 10%, 82%, 0.7)';
 const TEXT_HI = 'hsla(220, 10%, 90%, 0.9)';
 
-/* ── Cluster palette — vivid on dark ── */
+/* ── Stable cluster palette — deterministic hash per category name ── */
 const CLUSTER_PALETTE = [
   '#e8457a', '#3ec9a0', '#e8b832',
   '#a065d4', '#3dacd5', '#e07040',
-  '#4a90d9', '#c75a8c',
+  '#4a90d9', '#c75a8c', '#7bc74a',
+  '#d4a05e', '#5ac4c7', '#d45a5a',
 ];
+
+function stableHash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function stableColor(category: string): string {
+  return CLUSTER_PALETTE[stableHash(category) % CLUSTER_PALETTE.length];
+}
 
 function hex(h: string, a: number): string {
   const v = Math.round(a * 255).toString(16).padStart(2, '0');
@@ -77,6 +91,8 @@ export interface GapSuggestion {
   prompt: string;
   context: string;
   bridgeNodes: string[];
+  nodeIdsA: string[];
+  nodeIdsB: string[];
 }
 
 interface ClusterInfo {
@@ -87,6 +103,14 @@ interface ClusterInfo {
   totalPosts: number;
   nodeIds: string[];
   topConcepts: string[];
+}
+
+/* ── Speculative extension suggestions based on network gaps ── */
+interface NetworkExtension {
+  label: string;
+  reason: string;
+  nearCluster: string;
+  color: string;
 }
 
 /* ── Component ── */
@@ -109,6 +133,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
   const [expanded, setExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [bridgesExpanded, setBridgesExpanded] = useState(false);
+  const [hoveredGap, setHoveredGap] = useState<string | null>(null);
+  const [linkMode, setLinkMode] = useState<'topic' | 'note'>('topic');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -120,14 +147,15 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     description: string;
     category: string;
     bridgeNodes: string[];
+    isNote?: boolean;
   } | null>(null);
 
-  const openSuggestedDialog = (title: string, description: string, category: string, bridgeNodes: string[]) => {
+  const openSuggestedDialog = (title: string, description: string, category: string, bridgeNodes: string[], isNote = false) => {
     if (!user) {
-      toast({ title: 'Sign in required', description: 'You must be signed in to create a discussion.', variant: 'destructive' });
+      toast({ title: 'Sign in required', description: 'You must be signed in to contribute.', variant: 'destructive' });
       return;
     }
-    setSuggestDraft({ title, description, category, bridgeNodes });
+    setSuggestDraft({ title, description, category, bridgeNodes, isNote });
     setSuggestOpen(true);
   };
 
@@ -142,13 +170,13 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       });
       setSuggestOpen(false);
       setSuggestDraft(null);
-      toast({ title: 'Discussion created' });
+      toast({ title: suggestDraft.isNote ? 'Note added' : 'Discussion created' });
       if (newTopic?.slug) {
         if (onOpenDiscussion) onOpenDiscussion(newTopic.slug);
         else navigate(`/d/${newTopic.slug}`);
       }
     } catch (err: any) {
-      toast({ title: 'Error creating discussion', description: err.message, variant: 'destructive' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -158,35 +186,19 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
 
   const prevTopicIdRef = useRef<string | undefined>(currentTopicId);
 
-  // Keep Sigma sized correctly when mounted inside hidden/animated containers (Tabs/Collapsible)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     if (typeof ResizeObserver === 'undefined') return;
-
-    const ro = new ResizeObserver(() => {
-      sigmaRef.current?.resize();
-    });
-
+    const ro = new ResizeObserver(() => { sigmaRef.current?.resize(); });
     ro.observe(el);
-
-    // Next-tick resize fixes "blank canvas" when Sigma initialized at 0x0
     const t = window.setTimeout(() => sigmaRef.current?.resize(true), 0);
-
-    return () => {
-      window.clearTimeout(t);
-      ro.disconnect();
-    };
+    return () => { window.clearTimeout(t); ro.disconnect(); };
   }, []);
 
-  // When switching topics in local mode, re-focus the new topic node
   useEffect(() => {
-    if (mode !== 'local') {
-      prevTopicIdRef.current = currentTopicId;
-      return;
-    }
+    if (mode !== 'local') { prevTopicIdRef.current = currentTopicId; return; }
     if (!currentTopicId) return;
-
     if (prevTopicIdRef.current !== currentTopicId) {
       prevTopicIdRef.current = currentTopicId;
       setSelectedNode(currentTopicId);
@@ -194,10 +206,11 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     }
   }, [mode, currentTopicId]);
 
+  // Stable category → color mapping (deterministic hash, not index)
   const clusterMap = useMemo(() => {
     const unique = [...new Set(topics.map(t => t.category))];
     const m = new Map<string, number>();
-    unique.forEach((c, i) => m.set(c, i % CLUSTER_PALETTE.length));
+    unique.forEach(c => m.set(c, stableHash(c) % CLUSTER_PALETTE.length));
     return m;
   }, [topics]);
 
@@ -211,7 +224,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       if (g.concepts.length < 3) g.concepts.push(concept(t.title));
     }
     return Array.from(groups.entries()).map(([id, g]) => ({
-      id, label: g.label, color: CLUSTER_PALETTE[id % CLUSTER_PALETTE.length],
+      id, label: g.label, color: stableColor(g.label),
       nodeCount: g.count, totalPosts: g.posts, nodeIds: g.nodeIds, topConcepts: g.concepts,
     })).sort((a, b) => b.totalPosts - a.totalPosts);
   }, [topics, clusterMap]);
@@ -235,6 +248,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       (a: ClusterInfo, b: ClusterInfo) => `What tradeoffs emerge between ${a.label} and ${b.label} goals?`,
       (a: ClusterInfo, b: ClusterInfo) => `Could ${a.topConcepts[0] || a.label} approaches solve ${b.topConcepts[0] || b.label} problems?`,
       (a: ClusterInfo, b: ClusterInfo) => `Who are the hidden actors connecting ${a.label} and ${b.label}?`,
+      (a: ClusterInfo, b: ClusterInfo) => `What evidence links ${a.topConcepts[0] || a.label} to ${b.topConcepts[0] || b.label}?`,
+      (a: ClusterInfo, b: ClusterInfo) => `Is there a shared policy frame for ${a.label} and ${b.label}?`,
     ];
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
@@ -247,15 +262,73 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             prompt: templates[results.length % templates.length](clusters[i], clusters[j]),
             context: count === 0 ? `No connections yet` : `Only ${count} weak link`,
             bridgeNodes: [clusters[i].nodeIds[0], clusters[j].nodeIds[0]].filter(Boolean),
+            nodeIdsA: clusters[i].nodeIds,
+            nodeIdsB: clusters[j].nodeIds,
           });
         }
       }
     }
-    return results.slice(0, 4);
+    return results;
   }, [clusters, relations, topics, clusterMap]);
+
+  // ── Speculative network extensions ──
+  const extensions = useMemo<NetworkExtension[]>(() => {
+    const exts: NetworkExtension[] = [];
+    const catCounts = new Map<string, number>();
+    for (const t of topics) catCounts.set(t.category, (catCounts.get(t.category) || 0) + 1);
+
+    // Suggest extensions for small clusters
+    for (const c of clusters) {
+      if (c.nodeCount <= 2) {
+        exts.push({
+          label: `More on ${c.topConcepts[0] || c.label}`,
+          reason: `Only ${c.nodeCount} topic${c.nodeCount > 1 ? 's' : ''} — underexplored area`,
+          nearCluster: c.label,
+          color: c.color,
+        });
+      }
+    }
+
+    // Suggest adjacent themes based on common urban policy areas
+    const adjacentThemes: Record<string, string[]> = {
+      'Housing': ['Gentrification', 'Rent control alternatives', 'Social housing models'],
+      'Mobilität': ['Logistics & delivery', 'Accessibility', 'Noise pollution'],
+      'Mobility': ['Logistics & delivery', 'Accessibility', 'Noise pollution'],
+      'Education': ['Childcare', 'Youth programs', 'Digital literacy'],
+      'Bildung': ['Childcare', 'Youth programs', 'Digital literacy'],
+      'Public Safety': ['Community policing', 'Drug policy', 'Nightlife regulation'],
+      'Sicherheit': ['Community policing', 'Drug policy', 'Nightlife regulation'],
+      'Stadtentwicklung': ['Green spaces', 'Community governance', 'Cultural infrastructure'],
+      'Urban Planning': ['Green spaces', 'Community governance', 'Cultural infrastructure'],
+      'Infrastructure': ['Digital infrastructure', 'Water management', 'Energy transition'],
+    };
+
+    const existingTitlesLower = new Set(topics.map(t => t.title.toLowerCase()));
+    for (const c of clusters) {
+      const adj = adjacentThemes[c.label];
+      if (adj) {
+        for (const theme of adj) {
+          if (!existingTitlesLower.has(theme.toLowerCase()) && exts.length < 6) {
+            exts.push({
+              label: theme,
+              reason: `Adjacent to ${c.label} cluster`,
+              nearCluster: c.label,
+              color: c.color,
+            });
+          }
+        }
+      }
+    }
+
+    return exts.slice(0, 5);
+  }, [clusters, topics]);
 
   const importantNodes = useRef<Set<string>>(new Set());
   const centralityMap = useRef<Record<string, number>>({});
+
+  // Track which gap is hovered for visual highlighting
+  const hoveredGapRef = useRef<string | null>(null);
+  hoveredGapRef.current = hoveredGap;
 
   const selectedNodeData = useMemo<NodeData | null>(() => {
     if (!selectedNode) return null;
@@ -292,8 +365,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     let renderer: Sigma | null = null;
 
     const waitForSize = async () => {
-      // Sigma can initialize while Tabs/Collapsible are still measuring, resulting in a 0x0 canvas.
-      // We wait a few frames until the container has a non-trivial size.
       for (let i = 0; i < 60; i++) {
         const { width, height } = el.getBoundingClientRect();
         if (width > 20 && height > 20) return true;
@@ -323,15 +394,14 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
 
       for (const t of topics) {
         if (!includedNodes.has(t.id)) continue;
-        const cl = clusterMap.get(t.category) ?? 0;
-        const color = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
+        const color = stableColor(t.category);
         graph.addNode(t.id, {
           label: concept(t.title),
           fullTitle: t.title,
-          size: Math.max(6, Math.min(28, 6 + (t.post_count || 0) * 1.8)),
+          size: Math.max(4, Math.min(20, 4 + (t.post_count || 0) * 1.2)),
           color, originalColor: color,
           slug: t.slug, category: t.category, postCount: t.post_count || 0,
-          status: t.status, cluster: cl, forceLabel: false,
+          status: t.status, cluster: clusterMap.get(t.category) ?? 0, forceLabel: false,
         });
       }
 
@@ -343,16 +413,15 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
           const eKey = [r.source_topic_id, r.target_topic_id].sort().join('|');
           if (edgeSet.has(eKey)) continue;
           edgeSet.add(eKey);
-          const srcCl = clusterMap.get(topics.find(t => t.id === r.source_topic_id)?.category || '') ?? 0;
-          const tgtCl = clusterMap.get(topics.find(t => t.id === r.target_topic_id)?.category || '') ?? 0;
-          const same = srcCl === tgtCl;
-          const srcColor = CLUSTER_PALETTE[srcCl % CLUSTER_PALETTE.length];
+          const srcColor = stableColor(topics.find(t => t.id === r.source_topic_id)?.category || '');
+          const tgtColor = stableColor(topics.find(t => t.id === r.target_topic_id)?.category || '');
+          const same = srcColor === tgtColor;
           try {
             graph.addEdge(r.source_topic_id, r.target_topic_id, {
-              size: same ? 2.5 : 1.8,
-              color: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
-              originalColor: same ? hex(srcColor, 0.55) : hex('#8899aa', 0.35),
-              originalSize: same ? 2.5 : 1.8,
+              size: same ? 2.0 : 1.4,
+              color: same ? hex(srcColor, 0.45) : hex('#8899aa', 0.28),
+              originalColor: same ? hex(srcColor, 0.45) : hex('#8899aa', 0.28),
+              originalSize: same ? 2.0 : 1.4,
               type: 'line', isCrossCluster: !same, isInferred: false,
             });
           } catch { /* dup */ }
@@ -360,7 +429,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       }
 
       // ── Inferred edges: same-category topics without explicit connection ──
-      // This adds relational density even with sparse explicit relations
       const byCategory = new Map<string, string[]>();
       for (const t of topics) {
         const arr = byCategory.get(t.category) || [];
@@ -369,8 +437,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       }
       for (const [cat, ids] of byCategory.entries()) {
         if (ids.length < 2) continue;
-        const cl = clusterMap.get(cat) ?? 0;
-        const clColor = CLUSTER_PALETTE[cl % CLUSTER_PALETTE.length];
+        const clColor = stableColor(cat);
         for (let i = 0; i < ids.length; i++) {
           for (let j = i + 1; j < ids.length; j++) {
             const eKey = [ids[i], ids[j]].sort().join('|');
@@ -378,10 +445,10 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             edgeSet.add(eKey);
             try {
               graph.addEdge(ids[i], ids[j], {
-                size: 1.0,
-                color: hex(clColor, 0.2),
-                originalColor: hex(clColor, 0.2),
-                originalSize: 1.0,
+                size: 0.8,
+                color: hex(clColor, 0.15),
+                originalColor: hex(clColor, 0.15),
+                originalSize: 0.8,
                 type: 'line', isCrossCluster: false, isInferred: true,
               });
             } catch { /* dup */ }
@@ -401,7 +468,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         graph.forEachNode((node) => {
           const sz = graph.getNodeAttribute(node, 'size') as number;
           const c = centralities[node] || 0;
-          graph.setNodeAttribute(node, 'size', Math.max(6, sz + c * 24));
+          graph.setNodeAttribute(node, 'size', Math.max(4, sz + c * 16));
           graph.setNodeAttribute(node, 'forceLabel', important.has(node));
         });
       } catch { /* ok */ }
@@ -420,20 +487,15 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         },
       });
 
-      // Custom label draw — no background box, text shadow for readability
-      function drawNodeLabel(
-        context: CanvasRenderingContext2D,
-        data: any,
-        settings: any,
-      ) {
+      function drawNodeLabel(context: CanvasRenderingContext2D, data: any, settings: any) {
         if (!data.label) return;
         const size = settings.labelSize;
         const font = settings.labelFont;
         const weight = settings.labelWeight || '500';
         context.font = `${weight} ${size}px ${font}`;
         context.fillStyle = (data as any).forceLabel
-          ? 'hsla(220, 10%, 88%, 0.95)'
-          : 'hsla(220, 10%, 75%, 0.75)';
+          ? 'hsla(220, 10%, 88%, 0.90)'
+          : 'hsla(220, 10%, 75%, 0.65)';
         context.shadowColor = 'hsla(222, 10%, 5%, 0.9)';
         context.shadowBlur = 5;
         context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
@@ -441,12 +503,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         context.shadowBlur = 0;
       }
 
-      // Custom hover draw — dark background instead of white
-      function drawNodeHover(
-        context: CanvasRenderingContext2D,
-        data: any,
-        settings: any,
-      ) {
+      function drawNodeHover(context: CanvasRenderingContext2D, data: any, settings: any) {
         const size = settings.labelSize + 2;
         const font = settings.labelFont;
         const weight = '600';
@@ -457,7 +514,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         const padding = 6;
         const x = data.x + data.size + 3;
         const y = data.y - size / 2 - padding;
-        // Dark rounded background
         const radius = 4;
         context.fillStyle = 'hsla(222, 10%, 12%, 0.92)';
         context.beginPath();
@@ -466,7 +522,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         context.strokeStyle = 'hsla(222, 8%, 30%, 0.4)';
         context.lineWidth = 1;
         context.stroke();
-        // Text
         context.fillStyle = 'hsla(220, 10%, 92%, 0.95)';
         context.fillText(label, x, data.y + size / 3);
       }
@@ -491,20 +546,56 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       });
       sigmaRef.current = renderer;
 
-      // Next frame resize fixes "blank canvas" when initialized right at mount
       requestAnimationFrame(() => {
         if (!renderer || !alive) return;
-        try {
-          renderer.resize(true);
-          renderer.refresh();
-        } catch {
-          // no-op
-        }
+        try { renderer.resize(true); renderer.refresh(); } catch { }
       });
 
       // ─── Focus+Context reducer ───
       function applyReducers() {
         const focus = hoveredRef.current || selectedRef.current;
+
+        // Check if a bridge gap is being hovered
+        const gapId = hoveredGapRef.current;
+        const activeGap = gapId ? gaps.find(g => g.id === gapId) : null;
+
+        if (activeGap && !focus) {
+          // Highlight bridge clusters
+          const highlightNodes = new Set([...activeGap.nodeIdsA, ...activeGap.nodeIdsB]);
+          renderer!.setSetting('nodeReducer', (node: string, data: Partial<NodeDisplayData>) => {
+            const r = { ...data };
+            const orig = graph.getNodeAttribute(node, 'originalColor') as string;
+            if (highlightNodes.has(node)) {
+              r.color = orig;
+              r.highlighted = true;
+              r.zIndex = 5;
+              (r as any).forceLabel = true;
+              r.size = ((data.size as number) || 4) * 1.2;
+            } else {
+              r.color = hex(orig, 0.12);
+              r.label = '';
+              r.zIndex = 0;
+            }
+            return r;
+          });
+          renderer!.setSetting('edgeReducer', (_edge: string, data: Partial<EdgeDisplayData>) => {
+            const r = { ...data };
+            const src = graph.source(_edge), tgt = graph.target(_edge);
+            if (highlightNodes.has(src) && highlightNodes.has(tgt)) {
+              r.color = hex('#e8b832', 0.5);
+              r.size = 2;
+              r.zIndex = 3;
+            } else {
+              r.color = hex('#556677', 0.04);
+              r.size = 0.3;
+              r.zIndex = 0;
+            }
+            return r;
+          });
+          renderer!.refresh();
+          return;
+        }
+
         if (!focus || !graph.hasNode(focus)) {
           renderer!.setSetting('nodeReducer', (_n: string, d: Partial<NodeDisplayData>) => ({ ...d }));
           renderer!.setSetting('edgeReducer', (_e: string, d: Partial<EdgeDisplayData>) => ({ ...d }));
@@ -529,22 +620,22 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             r.highlighted = true; r.zIndex = 10;
             (r as any).forceLabel = true;
             r.label = graph.getNodeAttribute(node, 'fullTitle') as string;
-            r.size = ((data.size as number) || 6) * 1.6;
+            r.size = ((data.size as number) || 4) * 1.5;
             r.color = orig;
           } else if (n1.has(node)) {
             r.highlighted = true; r.zIndex = 5;
             (r as any).forceLabel = true;
             r.color = orig;
-            r.size = ((data.size as number) || 5) * 1.15;
+            r.size = ((data.size as number) || 4) * 1.1;
           } else if (n2.has(node)) {
-            r.color = hex(orig, 0.45); r.zIndex = 2;
+            r.color = hex(orig, 0.4); r.zIndex = 2;
             if (importantNodes.current.has(node)) {
               (r as any).forceLabel = true;
             } else {
               r.label = '';
             }
           } else {
-            r.color = hex(orig, 0.15); r.label = ''; r.zIndex = 0;
+            r.color = hex(orig, 0.12); r.label = ''; r.zIndex = 0;
           }
           return r;
         });
@@ -554,13 +645,13 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
           const src = graph.source(edge), tgt = graph.target(edge);
           const fc = graph.getNodeAttribute(focus, 'originalColor') as string;
           if ((src === focus || tgt === focus) && n1.has(src) && n1.has(tgt)) {
-            r.color = hex(fc, 0.85); r.size = 3.5; r.zIndex = 5;
+            r.color = hex(fc, 0.8); r.size = 3; r.zIndex = 5;
           } else if (n1.has(src) && n1.has(tgt)) {
-            r.color = hex(fc, 0.4); r.size = 2; r.zIndex = 3;
+            r.color = hex(fc, 0.35); r.size = 1.5; r.zIndex = 3;
           } else if ((n1.has(src) || n1.has(tgt)) && (n2.has(src) || n2.has(tgt))) {
-            r.color = hex('#8899aa', 0.2); r.size = 1; r.zIndex = 1;
+            r.color = hex('#8899aa', 0.15); r.size = 0.8; r.zIndex = 1;
           } else {
-            r.color = hex('#556677', 0.06); r.size = 0.4; r.zIndex = 0;
+            r.color = hex('#556677', 0.04); r.size = 0.3; r.zIndex = 0;
           }
           return r;
         });
@@ -586,14 +677,16 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
 
     return () => {
       alive = false;
-      try {
-        renderer?.kill();
-      } finally {
-        sigmaRef.current = null;
-        graphRef.current = null;
-      }
+      try { renderer?.kill(); } finally { sigmaRef.current = null; graphRef.current = null; }
     };
-  }, [topics, relations, clusterMap, navigate, onOpenDiscussion, mode, currentTopicId]);
+  }, [topics, relations, clusterMap, navigate, onOpenDiscussion, mode, currentTopicId, gaps]);
+
+  // Re-apply reducers when hoveredGap changes
+  useEffect(() => {
+    const r = sigmaRef.current, g = graphRef.current;
+    if (!r || !g) return;
+    r.refresh();
+  }, [hoveredGap]);
 
   useEffect(() => {
     selectedRef.current = selectedNode;
@@ -619,7 +712,6 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     onOpenDiscussion ? onOpenDiscussion(slug) : navigate(`/d/${slug}`);
   }, [navigate, onOpenDiscussion]);
 
-  // ── Broker nodes (connect multiple clusters) ──
   const brokerCount = useMemo(() => {
     if (!graphRef.current || topics.length < 2) return 0;
     let count = 0;
@@ -632,6 +724,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
     }
     return count;
   }, [topics, selectedNode]);
+
+  // How many visible bridge items
+  const visibleBridgeCount = bridgesExpanded ? gaps.length : Math.min(3, gaps.length);
 
   if (topics.length < 2) return null;
 
@@ -651,7 +746,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         }}
       />
 
-      {/* ── Top bar — search + expand only ── */}
+      {/* ── Top bar — search + expand ── */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end px-3 py-2 pointer-events-none">
         <div className="flex items-center gap-1.5 pointer-events-auto">
           <span className="text-[9px] mr-1 hidden sm:inline" style={{ color: TEXT_DIM }}>scroll · drag · dblclick</span>
@@ -675,7 +770,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                       <button key={t.id} onClick={() => focusNode(t.id)}
                         className="w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 hover:bg-white/5"
                         style={{ color: TEXT_MED }}>
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CLUSTER_PALETTE[(clusterMap.get(t.category) ?? 0) % CLUSTER_PALETTE.length] }} />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: stableColor(t.category) }} />
                         <span className="truncate">{t.title}</span>
                       </button>
                     ))}
@@ -715,8 +810,8 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
         </div>
       )}
 
-      {/* ── Bottom-left: cluster legend only ── */}
-      <div className="absolute bottom-4 left-4 z-10">
+      {/* ── Bottom-left: cluster legend + extensions ── */}
+      <div className="absolute bottom-4 left-4 z-10 space-y-2 max-w-[220px]">
         <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1 opacity-50 hover:opacity-100 transition-opacity"
           style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
           {clusters.map(c => (
@@ -728,40 +823,101 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             </button>
           ))}
         </div>
+
+        {/* Network extensions — speculative */}
+        {extensions.length > 0 && (
+          <div className="backdrop-blur-sm rounded-lg px-3 py-2 space-y-1.5 opacity-40 hover:opacity-100 transition-opacity"
+            style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
+            <div className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
+              <Ghost className="h-2.5 w-2.5" /> Possible extensions
+            </div>
+            {extensions.slice(0, 4).map((ext, i) => (
+              <div key={i} className="flex items-start gap-1.5 text-[10px]">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1 opacity-50 border" style={{ borderColor: ext.color }} />
+                <div className="min-w-0">
+                  <span style={{ color: TEXT_MED }}>{ext.label}</span>
+                  <span className="block text-[9px]" style={{ color: TEXT_DIM }}>{ext.reason}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Bottom-right: bridge opportunities OR selected node card ── */}
       {gaps.length > 0 && !selectedNodeData && (
-        <div className="absolute bottom-4 right-4 z-20 max-w-[280px]">
+        <div className="absolute bottom-4 right-4 z-20 max-w-[300px]">
           <div className="rounded-xl p-3 space-y-2.5 backdrop-blur-md" style={{ background: PANEL_BG, border: `1px solid ${PANEL_BORDER}` }}>
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
-              <Sparkles className="h-3 w-3" style={{ color: '#e8b832aa' }} /> Bridge opportunities
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_DIM }}>
+                <Sparkles className="h-3 w-3" style={{ color: '#e8b832aa' }} /> Bridge opportunities
+              </div>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ color: TEXT_DIM, background: 'hsla(220,10%,25%,0.5)' }}>
+                {gaps.length}
+              </span>
             </div>
-            {gaps.slice(0, 3).map(gap => (
-              <button key={gap.id} 
-                onClick={() => {
-                  const title = gap.prompt;
-                  const desc = `This discussion explores the intersection between ${gap.clusterA} and ${gap.clusterB}.`;
-                  openSuggestedDialog(title, desc, gap.clusterA, gap.bridgeNodes);
-                }}
-                disabled={isCreating}
-                className="w-full text-left group relative disabled:opacity-50 disabled:cursor-not-allowed">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: gap.colorA }} />
-                  <span className="text-[9px]" style={{ color: TEXT_DIM }}>{gap.clusterA}</span>
-                  <ArrowRight className="h-2.5 w-2.5 group-hover:text-amber-400/50 transition-colors" style={{ color: 'hsla(220,10%,40%,0.3)' }} />
-                  <span className="w-2 h-2 rounded-full" style={{ background: gap.colorB }} />
-                  <span className="text-[9px]" style={{ color: TEXT_DIM }}>{gap.clusterB}</span>
-                </div>
-                <p className="text-[11px] group-hover:opacity-100 opacity-70 transition-opacity leading-snug" style={{ color: TEXT_MED }}>{gap.prompt}</p>
-                <p className="text-[9px] mt-0.5" style={{ color: TEXT_DIM }}>{gap.context}</p>
-                {!user && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px] text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-white">
-                    Sign in to create
-                  </span>
-                )}
+
+            {/* Link type toggle */}
+            <div className="flex items-center gap-1 p-0.5 rounded-md" style={{ background: 'hsla(220,10%,20%,0.5)' }}>
+              <button
+                onClick={() => setLinkMode('topic')}
+                className={cn('flex-1 text-[9px] py-1 rounded text-center transition-all', linkMode === 'topic' ? 'font-semibold' : 'opacity-50')}
+                style={{ color: TEXT_MED, background: linkMode === 'topic' ? 'hsla(220,10%,30%,0.6)' : 'transparent' }}>
+                <Plus className="h-2.5 w-2.5 inline mr-0.5" /> New topic
               </button>
-            ))}
+              <button
+                onClick={() => setLinkMode('note')}
+                className={cn('flex-1 text-[9px] py-1 rounded text-center transition-all', linkMode === 'note' ? 'font-semibold' : 'opacity-50')}
+                style={{ color: TEXT_MED, background: linkMode === 'note' ? 'hsla(220,10%,30%,0.6)' : 'transparent' }}>
+                <StickyNote className="h-2.5 w-2.5 inline mr-0.5" /> Add note
+              </button>
+            </div>
+
+            <div className={cn('space-y-2', gaps.length > 3 && 'max-h-[200px] overflow-y-auto pr-1')}>
+              {gaps.slice(0, visibleBridgeCount).map(gap => (
+                <button key={gap.id}
+                  onMouseEnter={() => setHoveredGap(gap.id)}
+                  onMouseLeave={() => setHoveredGap(null)}
+                  onClick={() => {
+                    if (linkMode === 'note') {
+                      openSuggestedDialog(
+                        `Note: ${gap.clusterA} ↔ ${gap.clusterB}`,
+                        `Why these areas are connected: `,
+                        gap.clusterA, gap.bridgeNodes, true
+                      );
+                    } else {
+                      const title = gap.prompt;
+                      const desc = `This discussion explores the intersection between ${gap.clusterA} and ${gap.clusterB}.`;
+                      openSuggestedDialog(title, desc, gap.clusterA, gap.bridgeNodes);
+                    }
+                  }}
+                  disabled={isCreating}
+                  className="w-full text-left group relative disabled:opacity-50 disabled:cursor-not-allowed">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: gap.colorA }} />
+                    <span className="text-[9px]" style={{ color: TEXT_DIM }}>{gap.clusterA}</span>
+                    <ArrowRight className="h-2.5 w-2.5 group-hover:text-amber-400/50 transition-colors" style={{ color: 'hsla(220,10%,40%,0.3)' }} />
+                    <span className="w-2 h-2 rounded-full" style={{ background: gap.colorB }} />
+                    <span className="text-[9px]" style={{ color: TEXT_DIM }}>{gap.clusterB}</span>
+                  </div>
+                  <p className="text-[11px] group-hover:opacity-100 opacity-70 transition-opacity leading-snug" style={{ color: TEXT_MED }}>{gap.prompt}</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_DIM }}>{gap.context}</p>
+                  {!user && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px] text-[10px] font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-white">
+                      Sign in to contribute
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {gaps.length > 3 && (
+              <button onClick={() => setBridgesExpanded(e => !e)}
+                className="flex items-center gap-1 text-[9px] w-full justify-center py-0.5 transition-colors hover:bg-white/5 rounded"
+                style={{ color: TEXT_DIM }}>
+                {bridgesExpanded ? <><ChevronUp className="h-2.5 w-2.5" /> Show fewer</> : <><ChevronDown className="h-2.5 w-2.5" /> Show all {gaps.length}</>}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -776,7 +932,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                 <h3 className="text-sm font-semibold leading-snug" style={{ color: TEXT_HI }}>{selectedNodeData.title}</h3>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                    style={{ background: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] + '22', color: CLUSTER_PALETTE[selectedNodeData.cluster % CLUSTER_PALETTE.length] }}>
+                    style={{ background: stableColor(selectedNodeData.category) + '22', color: stableColor(selectedNodeData.category) }}>
                     {selectedNodeData.category}
                   </span>
                   <span className="text-[10px] flex items-center gap-0.5" style={{ color: TEXT_DIM }}>
@@ -827,6 +983,31 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
               </div>
             )}
 
+            {/* Soft linking: add note between topics */}
+            {selectedNodeData.degree > 0 && (
+              <button
+                onClick={() => {
+                  openSuggestedDialog(
+                    `Note on: ${concept(selectedNodeData.title)}`,
+                    `How this topic relates to its neighbors: `,
+                    selectedNodeData.category,
+                    [selectedNodeData.id],
+                    true
+                  );
+                }}
+                disabled={isCreating}
+                className="w-full text-left rounded-lg px-3 py-2 space-y-0.5 transition-colors hover:bg-white/5 disabled:opacity-50 group relative"
+                style={{ background: 'hsla(200,60%,40%,0.06)', border: '1px solid hsla(200,60%,40%,0.1)' }}
+              >
+                <span className="text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'hsla(200,60%,50%,0.6)' }}>
+                  <StickyNote className="h-2.5 w-2.5" /> Add a note
+                </span>
+                <p className="text-[10px] leading-snug" style={{ color: TEXT_MED }}>
+                  Annotate how this connects to other topics
+                </p>
+              </button>
+            )}
+
             {selectedNodeData.bridgedClusters.length > 0 && (
               <button
                 onClick={() => {
@@ -835,11 +1016,11 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
                   openSuggestedDialog(title, desc, selectedNodeData.bridgedClusters[0], [selectedNodeData.id]);
                 }}
                 disabled={isCreating}
-                className="w-full text-left rounded-lg px-3 py-2 space-y-1 transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed group relative block" 
+                className="w-full text-left rounded-lg px-3 py-2 space-y-0.5 transition-colors hover:bg-white/5 disabled:opacity-50 group relative"
                 style={{ background: 'hsla(45,80%,55%,0.06)', border: '1px solid hsla(45,80%,55%,0.1)' }}
               >
                 <span className="text-[9px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'hsla(45,80%,60%,0.6)' }}>
-                  {isCreating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />} 
+                  {isCreating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Plus className="h-2.5 w-2.5" />}
                   Suggested discussion
                 </span>
                 <p className="text-[10px] leading-snug group-hover:text-amber-100 transition-colors" style={{ color: TEXT_MED }}>
@@ -871,7 +1052,7 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Create suggested discussion</DialogTitle>
+            <DialogTitle>{suggestDraft?.isNote ? 'Add a note' : 'Create suggested discussion'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -880,26 +1061,28 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
               <Input
                 value={suggestDraft?.title ?? ''}
                 onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, title: e.target.value }) : d)}
-                placeholder="Discussion title"
+                placeholder={suggestDraft?.isNote ? 'Note title' : 'Discussion title'}
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs">Category</Label>
-              <Input
-                value={suggestDraft?.category ?? ''}
-                onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, category: e.target.value }) : d)}
-                placeholder="Category"
-              />
-            </div>
+            {!suggestDraft?.isNote && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Category</Label>
+                <Input
+                  value={suggestDraft?.category ?? ''}
+                  onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, category: e.target.value }) : d)}
+                  placeholder="Category"
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Description</Label>
+              <Label className="text-xs">{suggestDraft?.isNote ? 'Your note' : 'Description'}</Label>
               <Textarea
                 value={suggestDraft?.description ?? ''}
                 onChange={(e) => setSuggestDraft((d) => d ? ({ ...d, description: e.target.value }) : d)}
-                rows={3}
-                placeholder="What’s this discussion about?"
+                rows={suggestDraft?.isNote ? 4 : 3}
+                placeholder={suggestDraft?.isNote ? 'Explain the connection, context, or insight…' : "What's this discussion about?"}
               />
             </div>
 
@@ -914,9 +1097,9 @@ export default function TopicNetworkGraph({ topics, relations, fullHeight, heigh
             <Button variant="ghost" onClick={() => setSuggestOpen(false)}>Cancel</Button>
             <Button
               onClick={handleConfirmCreateSuggested}
-              disabled={isCreating || !(suggestDraft?.title ?? '').trim() || !(suggestDraft?.category ?? '').trim()}
+              disabled={isCreating || !(suggestDraft?.title ?? '').trim() || !(suggestDraft?.description ?? '').trim()}
             >
-              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : suggestDraft?.isNote ? 'Add Note' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>
