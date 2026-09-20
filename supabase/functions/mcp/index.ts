@@ -189,14 +189,14 @@ var get_discussion_insights_default = defineTool3({
             text: "No deliberation analysis exists yet for this discussion. It can be generated in the app's Insights panel."
           }
         ],
-        structuredContent: { analysis: null }
+        structuredContent: { created_at: null, analysis_json: null }
       };
     }
     return {
       content: [{ type: "text", text: JSON.stringify(data.content) }],
       structuredContent: {
         created_at: data.created_at,
-        analysis: data.content
+        analysis_json: JSON.stringify(data.content)
       }
     };
   }

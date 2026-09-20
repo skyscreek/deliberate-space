@@ -32,7 +32,7 @@ export default defineTool({
             text: "No deliberation analysis exists yet for this discussion. It can be generated in the app's Insights panel.",
           },
         ],
-        structuredContent: { analysis: null },
+        structuredContent: { created_at: null, analysis_json: null },
       };
     }
 
@@ -40,7 +40,7 @@ export default defineTool({
       content: [{ type: "text" as const, text: JSON.stringify(data.content) }],
       structuredContent: {
         created_at: data.created_at,
-        analysis: data.content as unknown as Record<string, unknown>,
+        analysis_json: JSON.stringify(data.content),
       },
     };
   },
