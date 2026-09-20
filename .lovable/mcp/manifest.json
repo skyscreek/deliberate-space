@@ -1,0 +1,259 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://jzxzixssuvkfbyryozon.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "deliberate-space",
+      "version": "0.1.0",
+      "title": "Deliberate Space"
+    },
+    "tools": [
+      {
+        "name": "list_discussions",
+        "title": "List discussions",
+        "description": "List discussion topics on the platform, newest first. Optionally filter by category or free-text search in title and description.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Free-text search over title and description. Pass null for no search."
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact category filter, e.g. 'Urban Planning'. Pass null for all categories."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "description": "Maximum number of topics to return (1-50)."
+            }
+          },
+          "required": [
+            "search",
+            "category",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_discussion",
+        "title": "Get discussion with posts",
+        "description": "Read one discussion by slug or id, including its threaded posts with author names, argument types and scores.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "slug": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Topic slug, e.g. 'car-free-friedrichstrasse'. Pass null if using id."
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Topic id. Pass null if using slug."
+            }
+          },
+          "required": [
+            "slug",
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_discussion_insights",
+        "title": "Get deliberation insights",
+        "description": "Read the cached deliberation analysis for a discussion: summary, tensions, argument clusters, open questions and contribution guidance.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "topic_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Topic id, as returned by list_discussions or get_discussion."
+            }
+          },
+          "required": [
+            "topic_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_post",
+        "title": "Post a contribution",
+        "description": "Post a contribution as the signed-in user: a top-level post in a discussion, or a reply to an existing post.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "topic_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Topic id the contribution belongs to."
+            },
+            "content": {
+              "type": "string",
+              "minLength": 2,
+              "description": "The contribution text."
+            },
+            "parent_post_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Post id to reply to, or null for a top-level post."
+            },
+            "argdown_type": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "claim",
+                    "support",
+                    "objection",
+                    "concern",
+                    "alternative",
+                    "question",
+                    "proposal",
+                    "evidence",
+                    "rebuttal"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Argument type of the contribution, or null."
+            }
+          },
+          "required": [
+            "topic_id",
+            "content",
+            "parent_post_id",
+            "argdown_type"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_discussion",
+        "title": "Create a discussion",
+        "description": "Create a new discussion topic as the signed-in user, with a title, description, category and optional concrete proposal.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Discussion title."
+            },
+            "description": {
+              "type": "string",
+              "description": "What the discussion is about. Pass an empty string if unknown."
+            },
+            "category": {
+              "type": "string",
+              "description": "Category label, e.g. 'Urban Planning'."
+            },
+            "proposal": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A concrete proposal under debate, or null."
+            }
+          },
+          "required": [
+            "title",
+            "description",
+            "category",
+            "proposal"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
